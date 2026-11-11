@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { InstallCard } from '../components/InstallCard';
 import { ProfileForm } from '../components/ProfileForm';
-import { GoogleButton, Icon, Notice, Spinner } from '../components/ui';
+import { GoogleButton, Icon, Notice, Spinner, useToast } from '../components/ui';
 import { Link, navigate } from '../lib/router';
 import { useAuth } from '../state/auth';
 
 export default function Account() {
   const auth = useAuth();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +38,7 @@ export default function Account() {
           <section className="card" aria-labelledby="acc-h">
             <h2 id="acc-h">Your details</h2>
             {!auth.profileComplete && <Notice kind="warn">Complete your profile to book courts and send inquiries.</Notice>}
-            <ProfileForm submitLabel="Save changes" />
+            <ProfileForm submitLabel="Save changes" onSaved={() => { toast('Your details were saved.'); navigate('/'); }} />
           </section>
 
           <section className="card link-list" aria-label="Shortcuts">
