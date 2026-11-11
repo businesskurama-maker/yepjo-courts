@@ -163,7 +163,7 @@ export async function uploadPhoto(photo: ProcessedPhoto, folder: PhotoFolder): P
 
 /** Best-effort removal of a stored photo that is no longer referenced. */
 export async function removePhoto(path: string | null | undefined) {
-  if (!path) return;
+  if (!path || path.startsWith('/')) return; // starter photos ship with the site, nothing to delete
   await supabase.storage.from('photos').remove([path]);
 }
 

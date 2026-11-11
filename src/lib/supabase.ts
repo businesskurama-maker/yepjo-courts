@@ -13,8 +13,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
 
-/** Public URL of a processed WebP photo in the `photos` bucket. */
-export const photoUrl = (path: string) => `${SUPABASE_URL}/storage/v1/object/public/photos/${path}`;
+/**
+ * Public URL of a processed WebP photo. Normally a path in the `photos` bucket;
+ * paths starting with "/" are starter photos shipped with the site (public/photos).
+ */
+export const photoUrl = (path: string) =>
+  path.startsWith('/') ? path : `${SUPABASE_URL}/storage/v1/object/public/photos/${path}`;
 
 export interface AppError {
   code: string;
