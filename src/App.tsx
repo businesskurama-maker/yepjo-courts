@@ -10,6 +10,7 @@ import Book from './pages/Book';
 import MyBookings from './pages/MyBookings';
 import ChatPage from './pages/ChatPage';
 import Account from './pages/Account';
+import Privacy from './pages/Privacy';
 
 const Admin = lazy(() => import('./admin/Admin'));
 
@@ -197,6 +198,7 @@ export default function App() {
   else if (path === '/chat') page = <ChatPage />;
   else if (path === '/account') page = <Account />;
   else if (path === '/welcome') page = <Welcome />;
+  else if (path === '/privacy') page = <Privacy />;
   else if (path === '/auth/callback') page = <AuthCallback />;
   else if (path === '/admin' || path.startsWith('/admin/')) {
     page = <Suspense fallback={<div className="page"><Spinner /></div>}><Admin /></Suspense>;

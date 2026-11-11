@@ -446,3 +446,8 @@ input::placeholder, textarea::placeholder { color: #737b85; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ------------------------------------------------------------------ prose (privacy policy) */
+.prose h2 { font-size: 1.02rem; margin: 18px 0 6px; }
+.prose p, .prose li { line-height: 1.6; color: var(--text-2, #c9ccd1); }
+.prose ul { padding-left: 20px; margin: 6px 0; }

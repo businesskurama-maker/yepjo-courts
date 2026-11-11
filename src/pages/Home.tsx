@@ -123,7 +123,7 @@ export default function Home() {
       </div>
 
       <footer className="site-footer muted tiny">
-        <span>© {new Date().getFullYear()} {settings.business_name}</span>
+        <span>© {new Date().getFullYear()} {settings.business_name} · <Link to="/privacy" className="link">Privacy policy</Link></span>
         <span>Developer: Kurama Information Technology Solutions by Chi Omega</span>
       </footer>
 
