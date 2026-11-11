@@ -1,11 +1,17 @@
-// Trusted upload path for every photo in the app (carousel + announcements).
+// upload-photo — the trusted upload path for every photo in the app
+// (carousel + announcements). No external imports, so it can be pasted
+// straight into the Supabase dashboard editor.
 //
-// The browser converts and compresses the image, but nothing it says is trusted:
-// this function checks that the caller is an administrator, that the bytes are a
-// genuine WebP file, and that the file is at most 300,000 bytes. Only then is it
-// stored, using the service-role key that exists solely in this server runtime.
-// The bucket itself also rejects non-WebP files and anything over 300,000 bytes.
-import { createClient } from "npm:@supabase/supabase-js@2";
+// The browser converts and compresses each image, but nothing it sends is
+// trusted. This function checks that:
+//   1. the caller is signed in (the token is verified by Supabase Auth),
+//   2. the caller is an administrator (public.admins),
+//   3. the bytes are a genuine WebP file of at most 300,000 bytes.
+// Only then is the photo stored, using the service-role key that Supabase
+// injects into this server runtime (it never reaches the browser).
+// The `photos` bucket also rejects non-WebP files and anything over 300,000 bytes.
+//
+// Dashboard setting: "Verify JWT with legacy secret" = OFF (this code does its own checks).
 
 const MAX_BYTES = 300_000;
 const BUCKET = "photos";
@@ -35,56 +41,71 @@ function isWebp(b: Uint8Array): boolean {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return reply(405, { error: "Use POST." });
+  try {
+    if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+    if (req.method !== "POST") return reply(405, { error: "Use POST." });
 
-  const url = Deno.env.get("SUPABASE_URL")!;
-  // Supabase injects these into every Edge Function; they never reach the browser.
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!url || !serviceKey) return reply(500, { error: "Upload service is not configured." });
-  const service = createClient(url, serviceKey, { auth: { persistSession: false } });
+    const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!base || !serviceKey) return reply(500, { error: "Upload service is not configured." });
+    const svc = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
 
-  // 1. Who is calling? (verified against Supabase Auth, not just decoded)
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return reply(401, { error: "Please sign in." });
-  const { data: userData, error: userError } = await service.auth.getUser(token);
-  if (userError || !userData?.user) return reply(401, { error: "Your session has expired. Please sign in again." });
+    // 1. Who is calling? Supabase Auth verifies the user's access token.
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (!token) return reply(401, { error: "Please sign in." });
+    const userRes = await fetch(`${base}/auth/v1/user`, {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${token}` },
+    });
+    if (!userRes.ok) return reply(401, { error: "Your session has expired. Please sign in again." });
+    const user = (await userRes.json()) as { id?: string; email?: string };
+    if (!user?.id) return reply(401, { error: "Your session has expired. Please sign in again." });
 
-  // 2. Are they an administrator?
-  const { data: adminRow, error: adminError } = await service
-    .from("admins").select("user_id").eq("user_id", userData.user.id).maybeSingle();
-  if (adminError) return reply(500, { error: "Could not check administrator access." });
-  if (!adminRow) return reply(403, { error: "Administrator access is required to upload photos." });
+    // 2. Are they an administrator?
+    const adminRes = await fetch(
+      `${base}/rest/v1/admins?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`,
+      { headers: svc },
+    );
+    if (!adminRes.ok) return reply(500, { error: "Could not check administrator access." });
+    const admins = (await adminRes.json()) as unknown[];
+    if (!Array.isArray(admins) || admins.length === 0) {
+      return reply(403, { error: "Administrator access is required to upload photos." });
+    }
 
-  // 3. Validate the destination and the actual bytes.
-  const folder = req.headers.get("x-folder") ?? "";
-  if (!FOLDERS.has(folder)) return reply(400, { error: "Unknown photo folder." });
+    // 3. Validate the destination and the actual bytes.
+    const folder = req.headers.get("x-folder") ?? "";
+    if (!FOLDERS.has(folder)) return reply(400, { error: "Unknown photo folder." });
+    const declared = Number(req.headers.get("content-length") ?? "0");
+    if (declared > MAX_BYTES) return reply(413, { error: "Photo is larger than 300 KB (300,000 bytes)." });
 
-  const declared = Number(req.headers.get("content-length") ?? "0");
-  if (declared > MAX_BYTES) return reply(413, { error: "Photo is larger than 300 KB (300,000 bytes)." });
+    const bytes = new Uint8Array(await req.arrayBuffer());
+    if (bytes.length === 0) return reply(400, { error: "The upload was empty." });
+    if (bytes.length > MAX_BYTES) return reply(413, { error: "Photo is larger than 300 KB (300,000 bytes)." });
+    if (!isWebp(bytes)) return reply(415, { error: "Photo is not a valid WebP file." });
 
-  const bytes = new Uint8Array(await req.arrayBuffer());
-  if (bytes.length === 0) return reply(400, { error: "The upload was empty." });
-  if (bytes.length > MAX_BYTES) return reply(413, { error: "Photo is larger than 300 KB (300,000 bytes)." });
-  if (!isWebp(bytes)) return reply(415, { error: "Photo is not a valid WebP file." });
+    // 4. Store it.
+    const path = `${folder}/${crypto.randomUUID()}.webp`;
+    const up = await fetch(`${base}/storage/v1/object/${BUCKET}/${path}`, {
+      method: "POST",
+      headers: { ...svc, "Content-Type": "image/webp", "Cache-Control": "max-age=31536000", "x-upsert": "false" },
+      body: bytes,
+    });
+    if (!up.ok) {
+      const detail = await up.text().catch(() => "");
+      return reply(500, { error: `Storage rejected the photo. ${detail}`.trim() });
+    }
 
-  // 4. Store it.
-  const path = `${folder}/${crypto.randomUUID()}.webp`;
-  const { error: uploadError } = await service.storage.from(BUCKET).upload(path, bytes, {
-    contentType: "image/webp",
-    cacheControl: "31536000",
-    upsert: false,
-  });
-  if (uploadError) return reply(500, { error: `Storage rejected the photo: ${uploadError.message}` });
+    // 5. Activity log (best effort).
+    await fetch(`${base}/rest/v1/activity_logs`, {
+      method: "POST",
+      headers: { ...svc, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        actor_id: user.id, actor_email: user.email ?? null, action: "photo.upload",
+        entity: "storage", entity_id: path, details: { bytes: bytes.length },
+      }),
+    }).catch(() => undefined);
 
-  await service.from("activity_logs").insert({
-    actor_id: userData.user.id,
-    actor_email: userData.user.email,
-    action: "photo.upload",
-    entity: "storage",
-    entity_id: path,
-    details: { bytes: bytes.length },
-  });
-
-  return reply(200, { path, bytes: bytes.length });
+    return reply(200, { path, bytes: bytes.length });
+  } catch (e) {
+    return reply(500, { error: `Upload failed: ${e instanceof Error ? e.message : String(e)}` });
+  }
 });
