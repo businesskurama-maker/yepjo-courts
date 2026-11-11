@@ -125,3 +125,7 @@ with Reclub.
 ---
 
 Developer: Kurama Information Technology Solutions by Chi Omega
+
+## Auto-publish
+
+Every push to `main` publishes the live site through `.github/workflows/deploy.yml`, using the `VERCEL_TOKEN` repository secret (scoped to the yepjo-courts Vercel project).
