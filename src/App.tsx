@@ -63,7 +63,7 @@ function Shell({ children }: { children: ReactNode }) {
   const { settings } = useSite();
   const online = useOnline();
   const unread = useUnreadReplies(auth.profileComplete ? auth.user?.id ?? null : null);
-  const isActive = (to: string) => (to === '/' ? path === '/' : path.startsWith(to));
+  const isActive = (to: string) => (to === '/' ? path === '/' : path === to || path.startsWith(`${to}/`));
   const inAdmin = path.startsWith('/admin');
 
   const links = (className: string) =>

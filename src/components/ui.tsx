@@ -43,6 +43,11 @@ const PATHS: Record<string, string> = {
   play: 'M7 5l12 7-12 7z',
   logout: 'M9 4H5v16h4M16 8l4 4-4 4M20 12H10',
   court: 'M3 5h18v14H3zM12 5v14M3 12h18',
+  // pickleball paddle + ball
+  pickleball: 'M15 3a6 6 0 0 1 4.2 10.2l-3.4 3.4a2 2 0 0 1-2.8 0l-5.6-5.6a2 2 0 0 1 0-2.8l3.4-3.4A6 6 0 0 1 15 3zM8.300 15.700l-4.800 4.800M6.100 13.500l4.400 4.400M20 20.500h.01',
+  // badminton shuttlecock
+  badminton: 'M12 21.500a2.500 2.500 0 0 0 2.500-2.500h-5a2.500 2.500 0 0 0 2.500 2.500zM9.500 19L5.500 4.500h13L14.500 19M9.200 4.500L11 19M14.800 4.500L13 19M7 10h10',
+  bolt: 'M13 3L5 13.500h6L10 21l8-10.500h-6z',
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; size?: number }) {

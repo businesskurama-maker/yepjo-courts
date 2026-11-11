@@ -35,33 +35,39 @@ export default function Home() {
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${settings.business_name}, ${settings.address}`)}`;
 
   return (
-    <div className="page home">
-      <section className="hero">
-        <img src="/logo.webp" alt={`${settings.business_name} logo`} width={132} height={132} className="hero-logo" />
-        <div className="hero-copy">
-          <h1>{settings.business_name}</h1>
-          <p className="muted">{settings.tagline}</p>
-          <div className="hero-actions">
-            <Link to="/book" className="btn btn-primary btn-lg"><Icon name="calendar" /> Book a Court</Link>
-          </div>
-          <div className="sport-row" role="group" aria-label="Choose a sport to book">
-            {SPORTS.map((s) => {
-              const n = courts.filter((c) => c.sport === s && c.is_active).length;
-              return (
-                <Link key={s} to={`/book?sport=${s}`} className={`sport-card sport-${s}`}>
-                  <span className="sport-name">{SPORT_LABEL[s]}</span>
-                  <span className="sport-meta">{n ? `${n} court${n > 1 ? 's' : ''}` : 'Courts'} <Icon name="right" size={16} /></span>
-                </Link>
-              );
-            })}
-          </div>
+    <div className="home">
+      <section className="home-hero" aria-labelledby="home-title">
+        <div className="hero-logo-wrap">
+          <img src="/logo.webp" alt={`${settings.business_name} logo`} width={220} height={220} className="hero-logo" />
+        </div>
+        <p className="eyebrow"><Icon name="pin" size={14} /> Brgy. Cabuynan · Tanauan</p>
+        <h1 id="home-title" className="hero-title">
+          <span className="hero-yepjo">YEPJO</span>
+          <span className="hero-sub">Pickleball &amp; Badminton Court</span>
+        </h1>
+        <p className="hero-tagline">{settings.tagline}</p>
+        <Link to="/book" className="btn btn-primary btn-xl"><Icon name="calendar" /> Book a Court</Link>
+        <p className="section-label">Choose your sport</p>
+        <div className="sport-row" role="group" aria-label="Choose a sport to book">
+          {SPORTS.map((s) => {
+            const n = courts.filter((c) => c.sport === s && c.is_active).length;
+            return (
+              <Link key={s} to={`/book?sport=${s}`} className={`sport-card sport-${s}`}>
+                <span className="sport-icon"><Icon name={s} size={30} /></span>
+                <span className="sport-name">{SPORT_LABEL[s]}</span>
+                <span className="sport-meta">{n ? `${n} court${n > 1 ? 's' : ''}` : 'Courts'} <Icon name="right" size={14} /></span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
-      <Carousel photos={photos} />
+      <div className="home-media">
+        <Carousel photos={photos} />
+      </div>
 
-      <div className="home-grid">
-        <section className="card" aria-labelledby="news-h">
+      <div className="home-info">
+        <section className="card info-card" aria-labelledby="news-h">
           <div className="card-head">
             <h2 id="news-h"><Icon name="megaphone" size={18} /> Announcements</h2>
             {news.length > PREVIEW_COUNT && (
@@ -69,7 +75,7 @@ export default function Home() {
             )}
           </div>
           {news.length === 0 ? (
-            <p className="muted small">No announcements right now.</p>
+            <p className="muted small empty-line"><Icon name="bolt" size={16} /> No announcements right now. Check back soon!</p>
           ) : (
             <ul className="news-list">
               {visible.map((a) => (
@@ -78,7 +84,7 @@ export default function Home() {
                     {a.image_path && <img src={photoUrl(a.image_path)} alt="" loading="lazy" decoding="async" />}
                     <span className="news-text">
                       <strong>{a.title}</strong>
-                      <span className="muted small clamp-2">{a.body}</span>
+                      <span className="muted small clamp-1">{a.body}</span>
                       <span className="muted tiny">{a.published_at ? fmtDateMed(a.published_at) : ''}</span>
                     </span>
                     <Icon name="right" size={18} />
@@ -89,7 +95,7 @@ export default function Home() {
           )}
         </section>
 
-        <section className="card" aria-labelledby="contact-h">
+        <section className="card info-card" aria-labelledby="contact-h">
           <div className="card-head"><h2 id="contact-h"><Icon name="pin" size={18} /> Visit &amp; contact</h2></div>
           <ul className="contact-list">
             <li>
@@ -107,22 +113,22 @@ export default function Home() {
                 <Icon name="facebook" size={18} />
                 {settings.facebook_url
                   ? <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer">{settings.facebook_name}</a>
-                  : <span>{settings.facebook_name} <span className="muted tiny">(Facebook page)</span></span>}
+                  : <span>{settings.facebook_name}</span>}
               </li>
             )}
           </ul>
           <div className="contact-actions">
             {settings.reclub_url && (
-              <a href={settings.reclub_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
-                <Icon name="external" size={16} /> Our club on Reclub
+              <a href={settings.reclub_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
+                <Icon name="external" size={16} /> Reclub
               </a>
             )}
-            <Link to="/chat" className="btn btn-ghost"><Icon name="chat" size={16} /> Chat with Yepjo</Link>
+            <Link to="/chat" className="btn btn-ghost btn-sm"><Icon name="chat" size={16} /> Chat with Yepjo</Link>
           </div>
         </section>
       </div>
 
-      <footer className="site-footer muted tiny">
+      <footer className="site-footer home-footer muted tiny">
         <span>© {new Date().getFullYear()} {settings.business_name} · <Link to="/privacy" className="link">Privacy policy</Link></span>
         <span>Developer: Kurama Information Technology Solutions by Chi Omega</span>
       </footer>

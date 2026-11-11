@@ -337,6 +337,7 @@ export default function Book() {
               const n = courts.filter((c) => c.sport === s && c.is_active).length;
               return (
                 <button key={s} type="button" className={`sport-card sport-${s}${sport === s ? ' is-active' : ''}`} onClick={() => pickSport(s)} disabled={n === 0}>
+                  <span className="sport-icon"><Icon name={s} size={28} /></span>
                   <span className="sport-name">{SPORT_LABEL[s]}</span>
                   <span className="sport-meta">{n ? `${n} court${n > 1 ? 's' : ''}` : 'Not available'} <Icon name="right" size={16} /></span>
                 </button>
