@@ -127,7 +127,11 @@ function AuthCallback() {
 
   useEffect(() => {
     if (!auth.ready || !auth.user) return;
-    if (auth.profileComplete) navigate(takeReturnTo(), { replace: true });
+    if (auth.profileComplete) {
+      // Returning users land on Home, except when they signed in to finish a booking or to open the admin area.
+      const to = takeReturnTo();
+      navigate(to.startsWith('/book') || to.startsWith('/admin') ? to : '/', { replace: true });
+    }
     else navigate('/welcome', { replace: true });
   }, [auth.ready, auth.user, auth.profileComplete]);
 
