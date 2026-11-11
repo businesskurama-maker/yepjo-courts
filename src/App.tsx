@@ -11,6 +11,7 @@ import MyBookings from './pages/MyBookings';
 import ChatPage from './pages/ChatPage';
 import Account from './pages/Account';
 import Privacy from './pages/Privacy';
+import Calendar from './pages/Calendar';
 
 const Admin = lazy(() => import('./admin/Admin'));
 
@@ -52,6 +53,7 @@ function useUnreadReplies(userId: string | null): number {
 const NAV = [
   { to: '/', label: 'Home', icon: 'home' },
   { to: '/book', label: 'Book', icon: 'calendar' },
+  { to: '/calendar', label: 'Schedule', icon: 'grid' },
   { to: '/bookings', label: 'Bookings', icon: 'ticket' },
   { to: '/chat', label: 'Chat', icon: 'chat' },
   { to: '/account', label: 'Account', icon: 'user' },
@@ -199,6 +201,7 @@ export default function App() {
   else if (path === '/account') page = <Account />;
   else if (path === '/welcome') page = <Welcome />;
   else if (path === '/privacy') page = <Privacy />;
+  else if (path === '/calendar') page = <Calendar />;
   else if (path === '/auth/callback') page = <AuthCallback />;
   else if (path === '/admin' || path.startsWith('/admin/')) {
     page = <Suspense fallback={<div className="page"><Spinner /></div>}><Admin /></Suspense>;

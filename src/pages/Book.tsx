@@ -58,12 +58,17 @@ export default function Book() {
     }
   }, []);
   const qsSport = SPORTS.find((s) => s === query.get('sport')) ?? null;
+  // Deep link from the availability calendar: ?sport&date&court&start → straight to the time step.
+  const qsDate = /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') ?? '') ? query.get('date') : null;
+  const qsCourt = Number(query.get('court')) || null;
+  const qsStart = Number(query.get('start')) > Date.now() ? Number(query.get('start')) : null;
+  const deep = !restored && qsSport && qsDate && qsCourt ? { date: qsDate, court: qsCourt, start: qsStart } : null;
   const [sport, setSport] = useState<Sport | null>(restored?.sport ?? qsSport);
-  const [date, setDate] = useState<string | null>(restored?.date ?? null);
-  const [courtId, setCourtId] = useState<number | null>(restored?.courtId ?? null);
-  const [start, setStart] = useState<number | null>(restored?.start ?? null);
-  const [minutes, setMinutes] = useState(restored?.minutes ?? 0);
-  const [step, setStep] = useState(restored ? 5 : qsSport ? 2 : 1);
+  const [date, setDate] = useState<string | null>(restored?.date ?? deep?.date ?? null);
+  const [courtId, setCourtId] = useState<number | null>(restored?.courtId ?? deep?.court ?? null);
+  const [start, setStart] = useState<number | null>(restored?.start ?? deep?.start ?? null);
+  const [minutes, setMinutes] = useState(restored?.minutes ?? (deep?.start ? settings.min_slots * settings.slot_minutes : 0));
+  const [step, setStep] = useState(restored ? 5 : deep ? 4 : qsSport ? 2 : 1);
 
   const [avail, setAvail] = useState<{ date: string; busy: Busy[] } | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
@@ -383,7 +388,10 @@ export default function Book() {
       {/* ---------------------------------------------------------- 2. date */}
       {step === 2 && sport && (
         <section className="card" aria-labelledby="s2">
-          <h2 id="s2">Choose a date</h2>
+          <div className="card-head">
+            <h2 id="s2">Choose a date</h2>
+            <Link to={`/calendar?sport=${sport}`} className="link small cal-link"><Icon name="grid" size={16} /> Full calendar</Link>
+          </div>
           <p className="muted small">Bookings are open from today until {fmtDateLong(toUtcMs(lastDay, 720))} (Philippine time).</p>
           <div className="date-strip" role="group" aria-label="Available dates">
             {dates.map((d, i) => (

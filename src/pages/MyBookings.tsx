@@ -130,7 +130,11 @@ export default function MyBookings() {
                 <span className="ref">Ref. {r.reference}</span>
                 {isUpcoming(r) && (canCancel(r)
                   ? <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setTarget(r)} disabled={!online}>{r.status === 'pending' ? 'Cancel' : 'Cancel booking'}</button>
-                  : <span className="muted tiny">{r.status === 'pending' ? 'Payment is being checked.' : settings.allow_cancellation ? `Cancellation closes ${settings.cancel_cutoff_hours}h before start.` : 'Online cancellation is off.'} <Link to="/chat" className="link">Message Yepjo</Link></span>)}
+                  : <span className="muted tiny cancel-help">
+                      {r.status === 'pending' ? 'Payment is being checked. To cancel, ' : settings.allow_cancellation ? `Less than ${settings.cancel_cutoff_hours} hours to go. To cancel, ` : 'To cancel, '}
+                      {settings.phone ? <><a href={`tel:${settings.phone.replace(/\s/g, '')}`} className="link">call {settings.phone}</a> or </> : 'call or '}
+                      <Link to="/chat" className="link">message Yepjo</Link>.
+                    </span>)}
               </div>
             </li>
           );

@@ -88,7 +88,8 @@ begin
   perform t.run(b, format('select book_court(%s, %s, 60)', c1, t.slot(1, '09:00')), 'OUTSIDE_HOURS');
   perform t.run(b, format('select book_court(%s, %s, 60)', c1, t.slot(1, '14:30')), 'OUTSIDE_HOURS');
   perform t.run(b, format('select book_court(%s, %s, 45)', c1, t.slot(1, '16:00')), 'INVALID_DURATION');
-  perform t.run(b, format('select book_court(%s, %s, 240)', c1, t.slot(1, '16:00')), 'INVALID_DURATION');
+  perform t.run(b, format('select book_court(%s, %s, 780)', c1, t.slot(1, '16:00')), 'INVALID_DURATION');
+  perform t.eq((select amount::text from t.run(b, format('select (book_court(%s, %s, 720)).amount', c1, t.slot(20, '12:00'))) as amount), '3600.00', '12-hour booking allowed at PHP 300/hr');
   perform t.run(null, format('select book_court(%s, %s, 60)', c1, t.slot(1, '16:00')), 'permission denied');
   perform t.run(b, format($q$insert into reservations (reference, court_id, kind, starts_at, ends_at)
                             values ('YPJ-HACKED', %s, 'online', now() + interval '1 day', now() + interval '2 days') returning 1$q$, c1),
@@ -130,7 +131,11 @@ begin
   soon := quote_literal((date_trunc('hour', now()) + interval '1 hour')::text);
   perform t.run(a, format('select book_court(%s, %s, 60)', bad1, soon));
   select id into rid from reservations where user_id = a and court_id = bad1;
-  perform t.run(a, format('select cancel_reservation(%L)', rid), 'CANCEL_NOT_ALLOWED');       -- inside the 2-hour cutoff
+  perform t.run(a, format('select cancel_reservation(%L)', rid), 'CANCEL_NOT_ALLOWED');       -- inside the 6-hour cutoff
+  perform t.run(a, format('select book_court(%s, %L, 60)', bad1, (date_trunc('hour', now()) + interval '5 hours')::text));
+  perform t.run(a, format('select cancel_reservation(%L)', (select id from reservations where user_id = a and court_id = bad1 and starts_at > now() + interval '4 hours')), 'CANCEL_NOT_ALLOWED');  -- 5 hours away is still inside 6 hours
+  perform t.run(a, format('select book_court(%s, %L, 60)', bad1, (date_trunc('hour', now()) + interval '8 hours')::text));
+  perform t.run(a, format('select (cancel_reservation(%L)).status', (select id from reservations where user_id = a and court_id = bad1 and starts_at > now() + interval '7 hours')));  -- 8 hours away can be cancelled
   update settings set allow_cancellation = false;
   perform t.run(b, format('select cancel_reservation((select id from reservations where user_id = %L and court_id = %s limit 1))', b, c2),
                 'CANCEL_NOT_ALLOWED');
