@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChatThread } from '../components/ChatThread';
-import { Empty, Icon, Notice, Pager, Spinner } from '../components/ui';
+import { Confirm, Empty, Icon, Notice, Pager, Spinner, useToast } from '../components/ui';
 import { navigate, useLocation } from '../lib/router';
 import { supabase, toAppError } from '../lib/supabase';
 import { fmtDateMed, fmtTime, todayYmd, ymdOf } from '../lib/time';
@@ -9,6 +9,7 @@ import { useAuth } from '../state/auth';
 
 export default function Inbox() {
   const auth = useAuth();
+  const toast = useToast();
   const { query } = useLocation();
   const selectedId = query.get('c');
   const [rows, setRows] = useState<Conversation[] | null>(null);
@@ -17,6 +18,8 @@ export default function Inbox() {
   const [pageSize, setPageSize] = useState(20);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     let q = supabase.from('conversations').select('*, profile:profiles(full_name,email,phone)', { count: 'exact' });
@@ -39,6 +42,18 @@ export default function Inbox() {
       void supabase.removeChannel(ch);
     };
   }, [load]);
+
+  const deleteThread = async () => {
+    if (!selectedId) return;
+    setDeleting(true);
+    const { data, error: err } = await supabase.rpc('admin_delete_conversation', { p_user_id: selectedId });
+    setDeleting(false);
+    setConfirmDelete(false);
+    if (err) return toast(toAppError(err).message, 'error');
+    toast(`Conversation deleted (${data ?? 0} message${data === 1 ? '' : 's'}).`);
+    navigate('/admin/inbox');
+    void load();
+  };
 
   const selected = (rows ?? []).find((c) => c.user_id === selectedId) ?? null;
   const when = (iso: string) => (ymdOf(new Date(iso).getTime()) === todayYmd() ? fmtTime(iso) : fmtDateMed(iso));
@@ -77,12 +92,15 @@ export default function Inbox() {
           <>
             <header className="thread-head">
               <button type="button" className="icon-btn thread-back" onClick={() => navigate('/admin/inbox')} aria-label="Back to conversations"><Icon name="left" /></button>
-              <div>
+              <div className="thread-who">
                 <strong>{selected?.profile?.full_name ?? 'Customer'}</strong>
                 <p className="small muted">
                   {selected?.profile?.email}{selected?.profile?.phone ? ` · ${selected.profile.phone}` : ''}
                 </p>
               </div>
+              <button type="button" className="btn btn-ghost btn-sm thread-delete" onClick={() => setConfirmDelete(true)} aria-label="Delete this conversation">
+                <Icon name="trash" size={18} /> <span>Delete</span>
+              </button>
             </header>
             <ChatThread key={selectedId} conversationId={selectedId} selfId={auth.user.id} asAdmin />
           </>
@@ -90,6 +108,14 @@ export default function Inbox() {
           <Empty icon="chat" title="Select a conversation">Customer inquiries appear here in real time.</Empty>
         )}
       </section>
+
+      {confirmDelete && (
+        <Confirm title="Delete this conversation?" confirmLabel="Delete conversation" danger busy={deleting}
+          onConfirm={() => void deleteThread()} onClose={() => setConfirmDelete(false)}>
+          <p>All messages with <strong>{selected?.profile?.full_name ?? 'this customer'}</strong> will be removed for both Yepjo and the customer. This cannot be undone.</p>
+          <p className="small muted">If they message again later, a new conversation starts.</p>
+        </Confirm>
+      )}
     </div>
   );
 }

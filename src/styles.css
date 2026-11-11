@@ -741,3 +741,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--lime); box-shado
   .cal-layout { grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.4fr); }
   .cal-page { max-width: 1400px; }
 }
+
+/* Inquiry thread: delete action */
+.thread-who { flex: 1; min-width: 0; }
+.thread-delete { color: #ff6b6b; flex-shrink: 0; }
+.thread-delete:hover { background: rgba(255, 107, 107, .12); }
+@media (max-width: 420px) { .thread-delete span { display: none; } }

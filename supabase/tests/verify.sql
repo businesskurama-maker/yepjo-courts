@@ -210,9 +210,16 @@ begin
                '1|0|Yes, 2 PM is open.', 'unread counters and preview updated');
   perform t.eq(t.run(a, 'select count(*) from messages'), '2', 'customer sees both sides of their own thread');
 
+  raise notice '--- deleting an inquiry conversation';
+  perform t.run(a, format('select admin_delete_conversation(%L)', a), 'FORBIDDEN');
+  perform t.run(null, format('select admin_delete_conversation(%L)', a), 'permission denied');
+  perform t.eq(t.run(adm, format('select admin_delete_conversation(%L)', a)), '2', 'admin deletes the thread and its 2 messages');
+  perform t.eq((select count(*)::text from messages where conversation_id = a), '0', 'messages are gone');
+  perform t.run(adm, format('select admin_delete_conversation(%L)', a), 'NOT_FOUND');
+  perform t.eq(t.run(a, 'select count(*) from messages'), '0', 'customer thread is empty after deletion');
   raise notice '--- activity log and storage safeguards';
   perform t.eq((select string_agg(distinct action, ', ' order by action) from activity_logs),
-    'admin.grant, admin.revoke, announcements.insert, announcements.update, carousel_photos.insert, reservation.block, reservation.cancel, reservation.walk_in, settings.update',
+    'admin.grant, admin.revoke, announcements.insert, announcements.update, carousel_photos.insert, conversation.delete, reservation.block, reservation.cancel, reservation.walk_in, settings.update',
     'admin actions were logged');
   perform t.eq((select file_size_limit || '|' || allowed_mime_types::text || '|' || public from storage.buckets where id = 'photos'),
     '300000|{image/webp}|true', 'bucket only accepts WebP up to 300,000 bytes');
