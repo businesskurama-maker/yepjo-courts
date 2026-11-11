@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [newAdmin, setNewAdmin] = useState('');
   const [revoking, setRevoking] = useState<AdminRow | null>(null);
+  const [invites, setInvites] = useState<{ email: string; created_at: string }[]>([]);
 
   useEffect(() => {
     if (!dirty) setForm(settings);
@@ -40,6 +41,8 @@ export default function SettingsPage() {
   const loadAdmins = useCallback(async () => {
     const { data, error: err } = await supabase.rpc('admin_list');
     if (!err) setAdmins((data as AdminRow[]) ?? []);
+    const inv = await supabase.from('admin_invites').select('email,created_at').order('created_at');
+    if (!inv.error) setInvites((inv.data as { email: string; created_at: string }[]) ?? []);
   }, []);
   useEffect(() => {
     void loadAdmins();
@@ -70,9 +73,11 @@ export default function SettingsPage() {
 
   const grant = async (e: FormEvent) => {
     e.preventDefault();
-    const { error: err } = await supabase.rpc('admin_grant', { p_email: newAdmin });
+    const { data, error: err } = await supabase.rpc('admin_grant', { p_email: newAdmin });
     if (err) return toast(toAppError(err).message, 'error');
-    toast(`${newAdmin.trim()} is now an administrator.`);
+    toast(data === 'invited'
+      ? `${newAdmin.trim()} is reserved. They become an administrator the first time they sign in with Google.`
+      : `${newAdmin.trim()} is now an administrator.`);
     setNewAdmin('');
     void loadAdmins();
   };
@@ -82,6 +87,13 @@ export default function SettingsPage() {
     if (err) toast(toAppError(err).message, 'error');
     else toast('Administrator access removed.');
     setRevoking(null);
+    void loadAdmins();
+  };
+
+  const removeInvite = async (email: string) => {
+    const { error: err } = await supabase.rpc('admin_invite_remove', { p_email: email });
+    if (err) toast(toAppError(err).message, 'error');
+    else toast('Reserved slot cleared.');
     void loadAdmins();
   };
 
@@ -186,8 +198,23 @@ export default function SettingsPage() {
             </li>
           ))}
         </ul>
+        <h3 className="section-label">Reserved client slots ({invites.length}/2)</h3>
+        <ul className="rows">
+          {[0, 1].map((i) => {
+            const inv = invites[i];
+            return (
+              <li key={i} className="row">
+                <span className="row-main">
+                  <strong>{inv ? inv.email : `Slot ${i + 1} — open`}</strong>
+                  <span className="small muted">{inv ? `Waiting for first Google sign-in · reserved ${fmtDateMed(inv.created_at)}` : 'Add a client email below to reserve this slot.'}</span>
+                </span>
+                {inv ? <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => void removeInvite(inv.email)}>Clear</button> : <span className="badge">Open</span>}
+              </li>
+            );
+          })}
+        </ul>
         <form className="inline-form" onSubmit={grant}>
-          <Field label="Add an administrator by email" hint="They must have signed in with Google at least once.">
+          <Field label="Add an administrator by email" hint="Existing accounts become admins right away. New emails take a reserved slot and become admins on their first Google sign-in.">
             <input type="email" value={newAdmin} onChange={(e) => setNewAdmin(e.target.value)} placeholder="name@gmail.com" required />
           </Field>
           <button type="submit" className="btn btn-outline">Add</button>
