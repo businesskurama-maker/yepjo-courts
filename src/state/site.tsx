@@ -22,6 +22,11 @@ export const DEFAULT_SETTINGS: Settings = {
   hours_confirmed: false,
   rates_confirmed: false,
   policy_confirmed: false,
+  online_payment_enabled: false,
+  allow_pay_at_venue: true,
+  payment_qr_path: null,
+  payment_instructions: '',
+  payment_hold_minutes: 30,
 };
 
 interface SiteState {

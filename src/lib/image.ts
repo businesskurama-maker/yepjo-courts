@@ -133,7 +133,7 @@ export async function processPhoto(
   throw new PhotoError('This photo could not be reduced to 300 KB at a usable quality. Try cropping it tighter or choosing a simpler photo.');
 }
 
-export type PhotoFolder = 'carousel' | 'announcements';
+export type PhotoFolder = 'carousel' | 'announcements' | 'payments';
 
 /** Sends a processed photo through the trusted upload function. Returns its storage path. */
 export async function uploadPhoto(photo: ProcessedPhoto, folder: PhotoFolder): Promise<string> {

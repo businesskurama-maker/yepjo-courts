@@ -15,7 +15,7 @@
 
 const MAX_BYTES = 300_000;
 const BUCKET = "photos";
-const FOLDERS = new Set(["carousel", "announcements"]);
+const FOLDERS = new Set(["carousel", "announcements", "payments"]);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

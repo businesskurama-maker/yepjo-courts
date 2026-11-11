@@ -10,11 +10,13 @@ import Bookings from './Bookings';
 import Courts from './Courts';
 import { Announcements, Photos } from './Content';
 import Inbox from './Inbox';
+import Payments from './Payments';
 import SettingsPage from './SettingsPage';
 
 const TABS = [
   { to: '/admin', label: 'Dashboard', icon: 'grid' },
   { to: '/admin/bookings', label: 'Bookings', icon: 'ticket' },
+  { to: '/admin/payments', label: 'Payments', icon: 'qr' },
   { to: '/admin/courts', label: 'Courts', icon: 'court' },
   { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
   { to: '/admin/photos', label: 'Photos', icon: 'image' },
@@ -40,6 +42,20 @@ function useUnreadInquiries(): number {
       void supabase.removeChannel(ch);
     };
   }, []);
+  return count;
+}
+
+/** Online payments waiting for an admin to check, kept live. */
+function usePaymentsToCheck(): number {
+  const { pulse } = useSite();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    void supabase.from('reservations').select('id', { count: 'exact', head: true })
+      .eq('status', 'pending').eq('payment_status', 'submitted')
+      .then(({ count: c }) => alive && setCount(c ?? 0));
+    return () => { alive = false; };
+  }, [pulse]);
   return count;
 }
 
@@ -74,10 +90,12 @@ export default function Admin() {
 
 function AdminArea({ path }: { path: string }) {
   const unread = useUnreadInquiries();
+  const toCheck = usePaymentsToCheck();
   const active = (to: string) => (to === '/admin' ? path === '/admin' : path.startsWith(to));
 
   let page;
-  if (path === '/admin') page = <Dashboard unread={unread} />;
+  if (path === '/admin') page = <Dashboard unread={unread} toCheck={toCheck} />;
+  else if (path.startsWith('/admin/payments')) page = <Payments />;
   else if (path.startsWith('/admin/bookings')) page = <Bookings />;
   else if (path.startsWith('/admin/courts')) page = <Courts />;
   else if (path.startsWith('/admin/announcements')) page = <Announcements />;
@@ -95,6 +113,7 @@ function AdminArea({ path }: { path: string }) {
             <Icon name={t.icon} size={18} />
             <span>{t.label}</span>
             {t.to === '/admin/inbox' && unread > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${unread} unread`}>{unread}</span>}
+            {t.to === '/admin/payments' && toCheck > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${toCheck} to check`}>{toCheck}</span>}
           </Link>
         ))}
       </nav>
@@ -104,7 +123,7 @@ function AdminArea({ path }: { path: string }) {
 }
 
 // ---------------------------------------------------------------- dashboard
-function Dashboard({ unread }: { unread: number }) {
+function Dashboard({ unread, toCheck }: { unread: number; toCheck: number }) {
   const { settings, courts, pulse } = useSite();
   const [rows, setRows] = useState<Reservation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +157,7 @@ function Dashboard({ unread }: { unread: number }) {
     !settings.rates_confirmed && { label: 'Court rates have not been set or confirmed', to: '/admin/courts' },
     !settings.policy_confirmed && { label: 'Booking increments, durations and cancellation policy use defaults', to: '/admin/settings' },
     !settings.facebook_url && { label: 'Facebook page link is missing', to: '/admin/settings' },
+    !settings.payment_qr_path && { label: 'Payment QR code not uploaded yet (online payment is off)', to: '/admin/settings' },
   ].filter(Boolean) as { label: string; to: string }[];
 
   return (
@@ -154,6 +174,10 @@ function Dashboard({ unread }: { unread: number }) {
         <Link to="/admin/inbox" className="stat card">
           <span className="stat-num">{unread}</span>
           <span className="stat-label">Unread inquiries</span>
+        </Link>
+        <Link to="/admin/payments" className="stat card">
+          <span className="stat-num">{toCheck}</span>
+          <span className="stat-label">Payments to check</span>
         </Link>
         <Link to={`/admin/bookings?date=${today}&kind=block`} className="stat card">
           <span className="stat-num">{rows ? blocks.length : '–'}</span>

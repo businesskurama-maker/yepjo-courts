@@ -8,6 +8,7 @@ import {
 } from '../lib/time';
 import { SPORTS, SPORT_LABEL, type Busy, type Court, type Reservation, type Sport } from '../lib/types';
 import { RETURN_KEY, useAuth } from '../state/auth';
+import { PaymentPanel } from '../components/Payment';
 import { useSite } from '../state/site';
 
 const PENDING_KEY = 'yepjo:pending-booking';
@@ -71,6 +72,19 @@ export default function Book() {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Reservation | null>(null);
+  const onlinePay = settings.online_payment_enabled && !!settings.payment_qr_path;
+  const [payOnline, setPayOnline] = useState(false);
+  const usePayOnline = onlinePay && (payOnline || !settings.allow_pay_at_venue);
+  // While a booking waits for payment approval, pick up the admin's decision live.
+  const doneId = done?.status === 'pending' ? done.id : null;
+  useEffect(() => {
+    if (!doneId) return;
+    let alive = true;
+    void supabase.from('reservations').select('*').eq('id', doneId).maybeSingle().then(({ data }) => {
+      if (alive && data) setDone((d) => (d && d.id === doneId ? { ...d, ...(data as Reservation) } : d));
+    });
+    return () => { alive = false; };
+  }, [doneId, pulse]);
 
   const slotMin = settings.slot_minutes;
   const slotMs = slotMin * 60_000;
@@ -213,7 +227,7 @@ export default function Book() {
       if (clash) throw { code: 'SLOT_TAKEN', message: 'Sorry, that time has just been taken. Please choose another slot.' } satisfies AppError;
       // …and let the database make the final, atomic decision.
       const { data, error: err } = await supabase.rpc('book_court', {
-        p_court_id: court.id, p_starts_at: new Date(start).toISOString(), p_minutes: minutes,
+        p_court_id: court.id, p_starts_at: new Date(start).toISOString(), p_minutes: minutes, p_pay_online: usePayOnline,
       });
       if (err) throw toAppError(err);
       const saved = data as Reservation | null;
@@ -267,9 +281,26 @@ export default function Book() {
     return (
       <div className="page page-narrow">
         <div className="card success-card" role="status">
-          <span className="success-mark"><Icon name="check" size={30} /></span>
-          <h1>Booking confirmed</h1>
-          <p className="muted small">Show this reference at the court.</p>
+          {done.status === 'pending' ? (
+            <>
+              <span className="success-mark pending-mark"><Icon name="clock" size={30} /></span>
+              <h1>{done.payment_status === 'submitted' ? 'Payment sent' : 'Court held: pay to confirm'}</h1>
+              <p className="muted small">{done.payment_status === 'submitted'
+                ? 'Yepjo will confirm your booking once the payment is checked.'
+                : `Your court is held for ${settings.payment_hold_minutes} minutes while you pay.`}</p>
+            </>
+          ) : done.status === 'cancelled' ? (
+            <>
+              <h1>Booking released</h1>
+              <p className="muted small">The payment time ran out, so the court was released. You can book again.</p>
+            </>
+          ) : (
+            <>
+              <span className="success-mark"><Icon name="check" size={30} /></span>
+              <h1>Booking confirmed</h1>
+              <p className="muted small">Show this reference at the court.</p>
+            </>
+          )}
           <p className="reference" aria-label={`Booking reference ${done.reference}`}>{done.reference}</p>
           <dl className="facts">
             <div><dt>Sport</dt><dd>{c ? SPORT_LABEL[c.sport] : ''}</dd></div>
@@ -277,7 +308,9 @@ export default function Book() {
             <div><dt>Date</dt><dd>{fmtDateLong(done.starts_at)}</dd></div>
             <div><dt>Starts</dt><dd>{fmtTime(done.starts_at)}</dd></div>
             <div><dt>Ends</dt><dd>{fmtTime(done.ends_at)}{ymdOf(new Date(done.starts_at).getTime()) !== ymdOf(new Date(done.ends_at).getTime()) ? `, ${fmtDateLong(done.ends_at)}` : ''}</dd></div>
+            {done.amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(Number(done.amount), settings.currency)}</dd></div>}
           </dl>
+          <PaymentPanel booking={done} onChange={setDone} />
           <div className="btn-row">
             <Link to="/bookings" className="btn btn-primary">View my bookings</Link>
             <button type="button" className="btn btn-ghost" onClick={bookAnother}>Book another</button>
@@ -455,8 +488,25 @@ export default function Book() {
             <div><dt>Start time</dt><dd>{fmtTime(start)}</dd></div>
             <div><dt>End time</dt><dd>{fmtTime(end)}{endsNextDay && <> <span className="badge">next day</span><br /><span className="small muted">{fmtDateLong(end)}</span></>}</dd></div>
             <div><dt>Duration</dt><dd>{fmtDuration(minutes)}</dd></div>
-            {amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(amount, settings.currency)} <span className="muted small">(pay at the court)</span></dd></div>}
+            {amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(amount, settings.currency)}</dd></div>}
           </dl>
+          {onlinePay ? (
+            <fieldset className="pay-choice">
+              <legend className="field-label">How will you pay?</legend>
+              <label className={`pay-option${usePayOnline ? ' is-active' : ''}`}>
+                <input type="radio" name="pay" checked={usePayOnline} onChange={() => setPayOnline(true)} />
+                <span><strong>Pay online now</strong><small>Scan our QR (GCash, Maya or bank), then enter the last 6 digits of the reference. Confirmed once Yepjo checks it.</small></span>
+              </label>
+              {settings.allow_pay_at_venue && (
+                <label className={`pay-option${!usePayOnline ? ' is-active' : ''}`}>
+                  <input type="radio" name="pay" checked={!usePayOnline} onChange={() => setPayOnline(false)} />
+                  <span><strong>Pay at the court</strong><small>Your booking is confirmed right away. Pay at the counter when you arrive.</small></span>
+                </label>
+              )}
+            </fieldset>
+          ) : (
+            <p className="muted small">Payment: at the court when you arrive.</p>
+          )}
           <p className="muted small policy">
             {settings.allow_cancellation
               ? `You can cancel in My Bookings up to ${settings.cancel_cutoff_hours} hour${settings.cancel_cutoff_hours === 1 ? '' : 's'} before the start time.`
@@ -479,7 +529,7 @@ export default function Book() {
               <div className="btn-row">
                 <button type="button" className="btn btn-ghost" onClick={() => setStep(4)} disabled={submitting}>Change time</button>
                 <button type="button" className="btn btn-primary" onClick={() => void confirm()} disabled={submitting || !online || !selectionOk}>
-                  {submitting ? 'Confirming…' : 'Confirm booking'}
+                  {submitting ? 'Confirming…' : usePayOnline ? 'Hold court & pay' : 'Confirm booking'}
                 </button>
               </div>
             )}

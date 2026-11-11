@@ -3,7 +3,8 @@ import { Confirm, Empty, GoogleButton, Icon, Notice, Pager, Spinner, useOnline, 
 import { Link } from '../lib/router';
 import { supabase, toAppError } from '../lib/supabase';
 import { fmtDateLong, fmtDuration, fmtMoney, fmtRange } from '../lib/time';
-import { SPORT_LABEL, type Reservation } from '../lib/types';
+import { SPORT_LABEL, awaitingPayment, type Reservation } from '../lib/types';
+import { PaymentPanel, bookingBadge } from '../components/Payment';
 import { useAuth } from '../state/auth';
 import { useSite } from '../state/site';
 
@@ -57,14 +58,18 @@ export default function MyBookings() {
   }
 
   const all = rows ?? [];
-  const isUpcoming = (r: Reservation) => r.status === 'confirmed' && new Date(r.ends_at).getTime() > now;
+  const holdLapsed = (r: Reservation) => awaitingPayment(r) && !!r.hold_expires_at && new Date(r.hold_expires_at).getTime() <= now;
+  const isUpcoming = (r: Reservation) => (r.status === 'confirmed' || (r.status === 'pending' && !holdLapsed(r))) && new Date(r.ends_at).getTime() > now;
   const upcoming = all.filter(isUpcoming).reverse();
   const history = all.filter((r) => !isUpcoming(r));
   const list = tab === 'upcoming' ? upcoming : history;
   const shown = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const cutoffMs = settings.cancel_cutoff_hours * 3_600_000;
-  const canCancel = (r: Reservation) => settings.allow_cancellation && new Date(r.starts_at).getTime() - cutoffMs > now;
+  const canCancel = (r: Reservation) => r.status === 'pending'
+    ? r.payment_status !== 'submitted'
+    : settings.allow_cancellation && new Date(r.starts_at).getTime() - cutoffMs > now;
+  const replace = (saved: Reservation) => setRows((rs) => (rs ?? []).map((x) => (x.id === saved.id ? { ...x, ...saved } : x)));
 
   const cancel = async () => {
     if (!target) return;
@@ -109,22 +114,23 @@ export default function MyBookings() {
       <ul className="booking-list">
         {shown.map((r) => {
           const past = r.status === 'confirmed' && !isUpcoming(r);
+          const badge = r.status === 'pending' && holdLapsed(r) ? { text: 'Expired · not paid', cls: 'badge-off' } : bookingBadge(r, past);
           const minutes = (new Date(r.ends_at).getTime() - new Date(r.starts_at).getTime()) / 60_000;
           return (
             <li key={r.id} className="card booking">
               <div className="booking-head">
                 <strong>{r.court ? `${SPORT_LABEL[r.court.sport]} · ${r.court.name}` : 'Court'}</strong>
-                <span className={`badge ${r.status === 'cancelled' ? 'badge-off' : past ? '' : 'badge-ok'}`}>
-                  {r.status === 'cancelled' ? 'Cancelled' : past ? 'Completed' : 'Confirmed'}
-                </span>
+                <span className={`badge ${badge.cls}`}>{badge.text}</span>
               </div>
               <p>{fmtDateLong(r.starts_at)}</p>
               <p className="small">{fmtRange(r.starts_at, r.ends_at)} · {fmtDuration(minutes)}{r.amount != null ? ` · ${fmtMoney(Number(r.amount), settings.currency)}` : ''}</p>
+              {r.status === 'cancelled' && r.cancel_reason && <p className="tiny muted">{r.cancel_reason}</p>}
+              {isUpcoming(r) && r.status === 'pending' && <PaymentPanel booking={r} onChange={replace} />}
               <div className="booking-foot">
                 <span className="ref">Ref. {r.reference}</span>
                 {isUpcoming(r) && (canCancel(r)
-                  ? <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setTarget(r)} disabled={!online}>Cancel booking</button>
-                  : <span className="muted tiny">{settings.allow_cancellation ? `Cancellation closes ${settings.cancel_cutoff_hours}h before start.` : 'Online cancellation is off.'} <Link to="/chat" className="link">Message Yepjo</Link></span>)}
+                  ? <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setTarget(r)} disabled={!online}>{r.status === 'pending' ? 'Cancel' : 'Cancel booking'}</button>
+                  : <span className="muted tiny">{r.status === 'pending' ? 'Payment is being checked.' : settings.allow_cancellation ? `Cancellation closes ${settings.cancel_cutoff_hours}h before start.` : 'Online cancellation is off.'} <Link to="/chat" className="link">Message Yepjo</Link></span>)}
               </div>
             </li>
           );

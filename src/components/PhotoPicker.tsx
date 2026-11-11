@@ -31,7 +31,7 @@ export function PhotoPicker({ folder, onUploaded, onClose, title = 'Add photo' }
   const [file, setFile] = useState<File | null>(null);
   const [image, setImage] = useState<LoadedImage | null>(null);
   const [srcUrl, setSrcUrl] = useState<string | null>(null);
-  const [aspect, setAspect] = useState<number | null>(folder === 'carousel' ? 16 / 9 : 4 / 3);
+  const [aspect, setAspect] = useState<number | null>(folder === 'carousel' ? 16 / 9 : folder === 'payments' ? null : 4 / 3);
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0.5, y: 0.5 }); // centre of the crop, as a fraction of the image
   const [progress, setProgress] = useState<Progress>({ percent: 0, label: '' });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Confirm, Field, Icon, Notice, Toggle, useToast } from '../components/ui';
-import { supabase, toAppError } from '../lib/supabase';
+import { PhotoPicker } from '../components/PhotoPicker';
+import { photoUrl, supabase, toAppError } from '../lib/supabase';
 import { fmtDateMed, fmtDuration } from '../lib/time';
 import type { Settings } from '../lib/types';
 import { useAuth } from '../state/auth';
@@ -27,6 +28,7 @@ export default function SettingsPage() {
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [newAdmin, setNewAdmin] = useState('');
   const [revoking, setRevoking] = useState<AdminRow | null>(null);
+  const [pickingQr, setPickingQr] = useState(false);
   const [invites, setInvites] = useState<{ email: string; created_at: string }[]>([]);
 
   useEffect(() => {
@@ -60,7 +62,16 @@ export default function SettingsPage() {
       business_name: form.business_name.trim(), tagline: form.tagline.trim(), address: form.address.trim(),
       email: form.email.trim(), phone: form.phone.trim(), facebook_name: form.facebook_name.trim(),
       facebook_url: form.facebook_url.trim(), reclub_url: form.reclub_url.trim(), cancellation_note: form.cancellation_note.trim(),
+      payment_instructions: form.payment_instructions.trim(),
     };
+    if (cleaned.online_payment_enabled && !cleaned.payment_qr_path) {
+      setBusy(false);
+      return setError('Upload the payment QR code before turning on online payment.');
+    }
+    if (!cleaned.allow_pay_at_venue && !cleaned.online_payment_enabled) {
+      setBusy(false);
+      return setError('Keep at least one way to pay: turn on online payment or allow paying at the court.');
+    }
     // Send only the editable columns (never id / updated_at).
     const payload = Object.fromEntries((Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]).map((k) => [k, cleaned[k]]));
     const { error: err } = await supabase.from('settings').update(payload).eq('id', true);
@@ -167,6 +178,42 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <section className="card" aria-labelledby="set-pay">
+          <h2 id="set-pay"><Icon name="qr" size={18} /> Payments {!form.payment_qr_path && <span className="badge badge-warn">QR not uploaded</span>}</h2>
+          <div className="form">
+            <div className="qr-row">
+              {form.payment_qr_path
+                ? <img src={photoUrl(form.payment_qr_path)} alt="Current payment QR code" className="qr-preview" width={140} height={140} />
+                : <div className="qr-preview qr-empty"><Icon name="qr" size={40} /></div>}
+              <div className="stack">
+                <p className="small muted">Customers scan this QR (GCash, Maya, InstaPay or bank) and enter the last 6 digits of their reference number. Use a clear, straight-on image of your official QR.</p>
+                <div className="btn-row">
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setPickingQr(true)}>
+                    <Icon name="upload" size={16} /> {form.payment_qr_path ? 'Replace QR' : 'Upload QR code'}
+                  </button>
+                  {form.payment_qr_path && (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { set('payment_qr_path', null); set('online_payment_enabled', false); set('allow_pay_at_venue', true); }}>Remove</button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <Toggle checked={form.online_payment_enabled} disabled={!form.payment_qr_path} onChange={(v) => set('online_payment_enabled', v)}
+              label={form.online_payment_enabled ? 'Online QR payment is offered when booking' : 'Online QR payment is off'} />
+            <Toggle checked={form.allow_pay_at_venue} disabled={!form.online_payment_enabled} onChange={(v) => set('allow_pay_at_venue', v)}
+              label={form.allow_pay_at_venue ? 'Customers may also choose to pay at the court' : 'Online payment is required for every booking'} />
+            <div className="form-2">
+              <Field label="Hold the court while waiting for payment (minutes)" hint="Unpaid bookings are released after this time.">
+                <input type="number" min={5} max={1440} value={form.payment_hold_minutes} onChange={(e) => set('payment_hold_minutes', num(e.target.value, 5, 1440))} />
+              </Field>
+              <Field label="Payment instructions (optional)" hint="Shown under the QR, e.g. account name or number.">
+                <textarea rows={2} maxLength={600} value={form.payment_instructions} onChange={(e) => set('payment_instructions', e.target.value)}
+                  placeholder="GCash: Yepjo Pickleball · 0917 xxx xxxx" />
+              </Field>
+            </div>
+            <p className="muted small">After upload, press <strong>Save settings</strong> below. Payments to approve appear under <strong>Payments</strong>.</p>
+          </div>
+        </section>
+
         <section className="card" aria-labelledby="set-confirm">
           <h2 id="set-confirm">Confirmations</h2>
           <p className="muted small">The app launched with placeholder values. Tick each item once the business has confirmed it; the dashboard reminder then disappears.</p>
@@ -221,6 +268,10 @@ export default function SettingsPage() {
         </form>
       </section>
 
+      {pickingQr && (
+        <PhotoPicker folder="payments" title="Upload payment QR code" onClose={() => setPickingQr(false)}
+          onUploaded={(path) => { set('payment_qr_path', path); setPickingQr(false); toast('QR uploaded. Turn on online payment and press Save settings.'); }} />
+      )}
       {revoking && (
         <Confirm title="Remove administrator?" danger confirmLabel="Remove access" onConfirm={() => void revoke()} onClose={() => setRevoking(null)}>
           <p>{revoking.full_name ?? revoking.email} will no longer be able to open the admin area.</p>

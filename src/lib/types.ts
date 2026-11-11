@@ -22,6 +22,11 @@ export interface Settings {
   hours_confirmed: boolean;
   rates_confirmed: boolean;
   policy_confirmed: boolean;
+  online_payment_enabled: boolean;
+  allow_pay_at_venue: boolean;
+  payment_qr_path: string | null;
+  payment_instructions: string;
+  payment_hold_minutes: number;
 }
 
 export interface Court {
@@ -48,6 +53,12 @@ export interface Busy {
   state: 'booked' | 'blocked';
 }
 
+export type PaymentStatus = 'not_required' | 'unpaid' | 'submitted' | 'verified' | 'rejected';
+
+/** True when the customer still has to pay (or re-send a corrected reference) before the hold runs out. */
+export const awaitingPayment = (r: Pick<Reservation, 'status' | 'payment_status'>) =>
+  r.status === 'pending' && (r.payment_status === 'unpaid' || r.payment_status === 'rejected');
+
 export type ReservationKind = 'online' | 'walk_in' | 'block';
 
 export interface Reservation {
@@ -56,7 +67,7 @@ export interface Reservation {
   court_id: number;
   user_id: string | null;
   kind: ReservationKind;
-  status: 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled';
   starts_at: string;
   ends_at: string;
   customer_name: string | null;
@@ -67,6 +78,13 @@ export interface Reservation {
   created_at: string;
   cancelled_at: string | null;
   cancel_reason: string | null;
+  payment_method?: 'venue' | 'online';
+  payment_status?: PaymentStatus;
+  payment_ref?: string | null;
+  payment_submitted_at?: string | null;
+  payment_verified_at?: string | null;
+  payment_note?: string | null;
+  hold_expires_at?: string | null;
   court?: Pick<Court, 'id' | 'name' | 'sport'> | null;
 }
 
