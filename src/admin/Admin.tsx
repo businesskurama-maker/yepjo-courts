@@ -11,12 +11,14 @@ import Courts from './Courts';
 import { Announcements, Photos } from './Content';
 import Inbox from './Inbox';
 import Payments from './Payments';
+import Reports from './Reports';
 import SettingsPage from './SettingsPage';
 
 const TABS = [
   { to: '/admin', label: 'Dashboard', icon: 'grid' },
   { to: '/admin/bookings', label: 'Bookings', icon: 'ticket' },
   { to: '/admin/payments', label: 'Payments', icon: 'qr' },
+  { to: '/admin/reports', label: 'Sales report', icon: 'chart' },
   { to: '/admin/courts', label: 'Courts', icon: 'court' },
   { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
   { to: '/admin/photos', label: 'Photos', icon: 'image' },
@@ -97,6 +99,7 @@ function AdminArea({ path }: { path: string }) {
   if (path === '/admin') page = <Dashboard unread={unread} toCheck={toCheck} />;
   else if (path.startsWith('/admin/payments')) page = <Payments />;
   else if (path.startsWith('/admin/bookings')) page = <Bookings />;
+  else if (path.startsWith('/admin/reports')) page = <Reports />;
   else if (path.startsWith('/admin/courts')) page = <Courts />;
   else if (path.startsWith('/admin/announcements')) page = <Announcements />;
   else if (path.startsWith('/admin/photos')) page = <Photos />;

@@ -48,6 +48,8 @@ const PATHS: Record<string, string> = {
   // badminton shuttlecock
   badminton: 'M12 21.500a2.500 2.500 0 0 0 2.500-2.500h-5a2.500 2.500 0 0 0 2.500 2.500zM9.500 19L5.500 4.500h13L14.500 19M9.200 4.500L11 19M14.800 4.500L13 19M7 10h10',
   bolt: 'M13 3L5 13.500h6L10 21l8-10.500h-6z',
+  chart: 'M4 20h16M7 16v-5M12 16V6M17 16v-8',
+  print: 'M7 9V4h10v5M7 17H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M7 14h10v6H7z',
   qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2zM16 16h2v2h-2z',
 };
 

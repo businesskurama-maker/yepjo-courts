@@ -747,3 +747,51 @@ input:focus, select:focus, textarea:focus { border-color: var(--lime); box-shado
 .thread-delete { color: #ff6b6b; flex-shrink: 0; }
 .thread-delete:hover { background: rgba(255, 107, 107, .12); }
 @media (max-width: 420px) { .thread-delete span { display: none; } }
+
+/* ---------------------------------------------------------- sales report */
+.report-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.report-actions { display: flex; gap: 6px; }
+.month-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.month-label { position: relative; display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card, rgba(255,255,255,.04)); font-weight: 700; cursor: pointer; }
+.month-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.month-label input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.stat-delta { font-size: .74rem; font-weight: 700; margin-top: 2px; }
+.stat-delta.up { color: var(--green, #00e676); }
+.stat-delta.down { color: #ff6b6b; }
+.report-card { display: flex; flex-direction: column; gap: 10px; }
+.report-h { font-size: 1rem; margin: 0; }
+.report-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.report-notes { display: flex; gap: 6px; flex-wrap: wrap; }
+.hbar { display: grid; grid-template-columns: minmax(96px, 9rem) 1fr auto; align-items: center; gap: 10px; font-size: .86rem; }
+.hbar-label { color: var(--muted); }
+.hbar-track { height: 10px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; }
+.hbar-fill { display: block; height: 100%; border-radius: inherit; background: var(--lime); min-width: 2px; }
+.hbar-val { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; min-width: 4.5rem; }
+.day-chart { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; height: 150px; align-items: end; padding-bottom: 18px; position: relative; }
+.day-col { position: relative; height: 100%; display: flex; align-items: flex-end; }
+.day-col.is-weekend::before { content: ''; position: absolute; inset: 0 0 0 0; background: rgba(255,255,255,.025); border-radius: 3px; }
+.day-bar { position: relative; width: 100%; background: var(--lime); border-radius: 3px 3px 0 0; min-height: 0; }
+.day-col:hover .day-bar { background: var(--cyan, #19e3ff); }
+.day-num { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .66rem; color: var(--muted); }
+.report-grid { display: grid; gap: 12px; }
+@media (min-width: 900px) { .report-grid { grid-template-columns: 1.4fr 1fr; align-items: start; } }
+.report-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.report-table th, .report-table td { padding: 6px 4px; text-align: left; border-bottom: 1px solid var(--line); }
+.report-table thead th { color: var(--muted); font-weight: 600; font-size: .76rem; }
+.report-table tfoot th, .report-table tfoot td { font-weight: 700; border-bottom: 0; }
+.report-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.print-only { display: none; }
+@media print {
+  .topbar, .bottomnav, .admin-nav, .no-print, .toasts { display: none !important; }
+  .print-only { display: block; }
+  body { background: #fff !important; color: #000 !important; zoom: 1 !important; }
+  .admin-main, .main { padding: 0 !important; }
+  .card, .stat { background: #fff !important; border: 1px solid #ccc !important; box-shadow: none !important; color: #000 !important; break-inside: avoid; }
+  .stat-num, .hbar-val, .report-h { color: #000 !important; }
+  .hbar-fill, .day-bar { background: #444 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .muted, .hbar-label, .stat-label, .day-num { color: #555 !important; }
+  .report-print-title { font-weight: 700; font-size: 1.1rem; }
+}
+@media (max-width: 899px) { .report .stat-main { grid-column: 1 / -1; } }
+.report .stat-num { overflow-wrap: anywhere; }
