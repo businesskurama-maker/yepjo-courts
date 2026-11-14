@@ -177,8 +177,12 @@ begin
                'admin can change settings');
   perform t.run(adm, format('select admin_grant(%L)', 'ben@example.com'));
   perform t.eq(t.run(b, 'select is_admin()'), 'true', 'granted admin is recognised');
-  perform t.run(adm, format('select admin_revoke(%L)', b));
-  perform t.run(adm, format('select admin_revoke(%L)', adm), 'INVALID_REQUEST');
+  perform t.run(b, format('select admin_revoke(%L)', a), 'NOT_FOUND');          -- not an admin
+  perform t.run(adm, format('select admin_revoke(%L)', b));                      -- 2 admins: one removes the other
+  perform t.eq(t.run(b, 'select is_admin()'), 'false', 'removed admin loses access');
+  perform t.run(b, format('select admin_revoke(%L)', adm), 'FORBIDDEN');         -- removed admin cannot strike back
+  perform t.run(adm, format('select admin_revoke(%L)', adm), 'INVALID_REQUEST'); -- last admin cannot remove themself
+  perform t.eq((select count(*)::text from admins), '1', 'one administrator always remains');
 
   raise notice '--- announcements and carousel';
   ann := t.run(adm, $q$insert into announcements (title, body) values ('Holiday hours', 'Open until 1 AM.') returning id$q$)::uuid;

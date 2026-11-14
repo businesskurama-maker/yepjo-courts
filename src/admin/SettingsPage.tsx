@@ -232,6 +232,11 @@ export default function SettingsPage() {
 
       <section className="card" aria-labelledby="set-admins">
         <h2 id="set-admins"><Icon name="shield" size={18} /> Administrators</h2>
+        <p className="small muted">
+          {admins.length <= 1
+            ? 'You are the only administrator, so this account cannot be removed. Add another administrator first.'
+            : 'Any administrator can remove another one. You cannot remove yourself, and at least one administrator always remains.'}
+        </p>
         <ul className="rows">
           {admins.map((a) => (
             <li key={a.user_id} className="row">
@@ -274,7 +279,7 @@ export default function SettingsPage() {
       )}
       {revoking && (
         <Confirm title="Remove administrator?" danger confirmLabel="Remove access" onConfirm={() => void revoke()} onClose={() => setRevoking(null)}>
-          <p>{revoking.full_name ?? revoking.email} will no longer be able to open the admin area.</p>
+          <p>{revoking.full_name ?? revoking.email} will no longer be able to open the admin area. Their bookings and chats stay as they are.</p>
         </Confirm>
       )}
     </div>
