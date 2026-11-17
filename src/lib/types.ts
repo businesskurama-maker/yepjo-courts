@@ -38,6 +38,28 @@ export interface Court {
   hourly_rate: number | null;
 }
 
+export type DayType = 'weekday' | 'weekend';
+export interface CourtRate {
+  id?: number;
+  court_id: number;
+  day_type: DayType;
+  starts: string; // 'HH:MM[:SS]'
+  ends: string; // may be <= starts when the time set runs past midnight
+  rate: number;
+}
+
+export type ClosureKind = 'closed' | 'holiday' | 'event';
+export interface Closure {
+  id: string;
+  starts_on: string; // YYYY-MM-DD (business day)
+  ends_on: string;
+  court_ids: number[] | null; // null = every court
+  kind: ClosureKind;
+  title: string;
+  note: string | null;
+}
+export const CLOSURE_LABEL: Record<ClosureKind, string> = { closed: 'Closed', holiday: 'Holiday', event: 'Special event' };
+
 export interface CourtHours {
   court_id: number;
   dow: number;

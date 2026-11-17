@@ -6,7 +6,8 @@ import {
   DAY_MS, buildSlots, courtWindow, dayOfMonth, fmtDateLong, fmtDateShort, fmtDuration, fmtMoney, fmtMonth, fmtTime,
   fmtWeekday, runLength, toUtcMs, todayYmd, ymdAdd, ymdAddMonth, ymdOf, type Slot,
 } from '../lib/time';
-import { SPORTS, SPORT_LABEL, type Busy, type Court, type Reservation, type Sport } from '../lib/types';
+import { CLOSURE_LABEL, SPORTS, SPORT_LABEL, type Busy, type Court, type Reservation, type Sport } from '../lib/types';
+import { closureFor, dayTypeOf as dayTypeOfDate, priceFor, rateAt, rateRange, sportClosure } from '../lib/pricing';
 import { RETURN_KEY, useAuth } from '../state/auth';
 import { PaymentPanel } from '../components/Payment';
 import { useSite } from '../state/site';
@@ -37,7 +38,7 @@ function readPending(): Pending | null {
 }
 
 export default function Book() {
-  const { settings, courts, hours, pulse, loading, error: siteError, reload } = useSite();
+  const { settings, courts, hours, rates, closures, pulse, loading, error: siteError, reload } = useSite();
   const auth = useAuth();
   const online = useOnline();
   const toast = useToast();
@@ -139,8 +140,11 @@ export default function Book() {
 
   const availReady = avail !== null && avail.date === date;
   const slotsFor = useCallback(
-    (id: number): Slot[] => (date && availReady ? buildSlots(courtWindow(hours, id, date), slotMin, avail!.busy, id, now) : []),
-    [date, availReady, avail, hours, slotMin, now],
+    (id: number): Slot[] =>
+      date && availReady && !closureFor(closures, id, date)
+        ? buildSlots(courtWindow(hours, id, date), slotMin, avail!.busy, id, now)
+        : [],
+    [date, availReady, avail, hours, slotMin, now, closures],
   );
   const slots = useMemo(() => (court ? slotsFor(court.id) : []), [court, slotsFor]);
   const startIndex = start === null ? -1 : slots.findIndex((s) => s.start === start);
@@ -329,7 +333,13 @@ export default function Book() {
   const nextDaySlots = date ? slots.filter((s) => ymdOf(s.start) !== date) : [];
   const sameDaySlots = date ? slots.filter((s) => ymdOf(s.start) === date) : [];
   const endsNextDay = start !== null && end !== null && ymdOf(start) !== ymdOf(end);
-  const amount = court?.hourly_rate != null ? (court.hourly_rate * minutes) / 60 : null;
+  const amount = court && date && start !== null ? priceFor(court, rates, date, start, minutes) : null;
+  const money = (v: number) => fmtMoney(v, settings.currency).replace(/\.00$/, '');
+
+  const slotPrice = (ms: number) => {
+    const r = court && date ? rateAt(court, rates, date, ms) : null;
+    return r != null ? money(r) : 'Open';
+  };
 
   const slotButton = (s: Slot) => {
     const i = slots.indexOf(s);
@@ -339,7 +349,7 @@ export default function Book() {
       <button key={s.start} type="button" className={`slot slot-${s.state}${selected ? ' is-selected' : ''}`}
         disabled={s.state !== 'available'} aria-pressed={selected} aria-label={label} onClick={() => pickSlot(i)}>
         <span>{fmtTime(s.start)}</span>
-        <small>{selected ? 'Selected' : s.state === 'available' ? 'Open' : s.state === 'past' ? 'Past' : s.state === 'booked' ? 'Booked' : 'Blocked'}</small>
+        <small>{selected ? 'Selected' : s.state === 'available' ? slotPrice(s.start) : s.state === 'past' ? 'Past' : s.state === 'booked' ? 'Booked' : 'Blocked'}</small>
       </button>
     );
   };
@@ -394,14 +404,18 @@ export default function Book() {
           </div>
           <p className="muted small">Bookings are open from today until {fmtDateLong(toUtcMs(lastDay, 720))} (Philippine time).</p>
           <div className="date-strip" role="group" aria-label="Available dates">
-            {dates.map((d, i) => (
-              <button key={d} type="button" className={`date-chip${date === d ? ' is-active' : ''}`} onClick={() => pickDate(d)}
-                aria-pressed={date === d} aria-label={fmtDateLong(toUtcMs(d, 720))}>
-                <small>{d === today ? 'Today' : d < today ? 'Tonight' : fmtWeekday(d)}</small>
-                <strong>{dayOfMonth(d)}</strong>
-                <small>{i === 0 || dayOfMonth(d) === 1 || d === today ? fmtMonth(d) : ' '}</small>
-              </button>
-            ))}
+            {dates.map((d, i) => {
+              const shut = sportClosure(closures, sportCourts, d);
+              return (
+                <button key={d} type="button" className={`date-chip${date === d ? ' is-active' : ''}${shut ? ' is-closed' : ''}`} onClick={() => pickDate(d)}
+                  aria-pressed={date === d} disabled={!!shut} title={shut ? `${CLOSURE_LABEL[shut.kind]}: ${shut.title}` : undefined}
+                  aria-label={`${fmtDateLong(toUtcMs(d, 720))}${shut ? `, ${CLOSURE_LABEL[shut.kind]}: ${shut.title}` : ''}`}>
+                  <small>{d === today ? 'Today' : d < today ? 'Tonight' : fmtWeekday(d)}</small>
+                  <strong>{dayOfMonth(d)}</strong>
+                  <small>{shut ? CLOSURE_LABEL[shut.kind] : i === 0 || dayOfMonth(d) === 1 || d === today ? fmtMonth(d) : '\u00a0'}</small>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
@@ -418,13 +432,15 @@ export default function Book() {
               {sportCourts.map((c) => {
                 const list = slotsFor(c.id);
                 const open = list.filter((s) => s.state === 'available').length;
+                const shut = closureFor(closures, c.id, date);
+                const range = rateRange([c], rates, dayTypeOfDate(date));
                 return (
                   <button key={c.id} type="button" className={`court-card${courtId === c.id ? ' is-active' : ''}`} onClick={() => pickCourt(c.id)} disabled={open === 0}>
                     <span className="court-name"><Icon name="court" size={18} /> {c.name}</span>
                     <span className={`small ${open ? 'ok-text' : 'muted'}`}>
-                      {list.length === 0 ? 'Closed this day' : open === 0 ? 'Fully booked' : `${open} of ${list.length} slots open`}
+                      {shut ? `${CLOSURE_LABEL[shut.kind]}: ${shut.title}` : list.length === 0 ? 'Closed this day' : open === 0 ? 'Fully booked' : `${open} of ${list.length} slots open`}
                     </span>
-                    {c.hourly_rate != null && <span className="muted tiny">{fmtMoney(c.hourly_rate, settings.currency)} / hour</span>}
+                    {range && !shut && <span className="muted tiny">{range.min === range.max ? money(range.min) : `${money(range.min)}–${money(range.max)}`} / hour</span>}
                   </button>
                 );
               })}
@@ -441,7 +457,12 @@ export default function Book() {
           <p className="muted small">{SPORT_LABEL[sport]} · {court.name} · {fmtDateLong(toUtcMs(date, 720))}</p>
           {availError && <Notice kind="error" action={<button type="button" className="btn btn-sm" onClick={() => setReloadKey((k) => k + 1)}>Retry</button>}>Availability could not be loaded. {availError}</Notice>}
           {!availReady && !availError && <Spinner label="Checking availability…" />}
-          {availReady && slots.length === 0 && <p className="muted">This court is closed on this day. Choose another date.</p>}
+          {availReady && slots.length === 0 && (
+            <p className="muted">
+              {(() => { const k = closureFor(closures, court.id, date); return k ? `${CLOSURE_LABEL[k.kind]}: ${k.title}. ` : 'This court is closed on this day. '; })()}
+              Choose another date.
+            </p>
+          )}
           {availReady && slots.length > 0 && (
             <>
               <ul className="legend" aria-label="Legend">
@@ -450,6 +471,7 @@ export default function Book() {
                 <li><i className="sw sw-booked" /> Booked</li>
                 <li><i className="sw sw-blocked" /> Blocked</li>
               </ul>
+              <p className="tiny muted">Prices shown are per hour.</p>
               <div className="slot-grid">{sameDaySlots.map(slotButton)}</div>
               {nextDaySlots.length > 0 && (
                 <>

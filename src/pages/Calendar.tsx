@@ -6,7 +6,8 @@ import {
   DAY_MS, buildSlots, courtWindow, dayOfMonth, fmtDateLong, fmtMoney, fmtMonth, fmtTime, fmtWeekday,
   toUtcMs, todayYmd, ymdAdd, ymdAddMonth, ymdOf, type Slot,
 } from '../lib/time';
-import { SPORTS, SPORT_LABEL, type Busy, type Sport } from '../lib/types';
+import { CLOSURE_LABEL, SPORTS, SPORT_LABEL, type Busy, type Court, type CourtRate, type Sport } from '../lib/types';
+import { closureFor, dayTypeOf, fmtClock, rateRange, sportClosure } from '../lib/pricing';
 import { useSite } from '../state/site';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -19,7 +20,7 @@ const hourLabel = (t: number) => fmtTime(t).replace(':00', '').replace(' ', '');
  * hour jumps straight into the booking flow with that court and time selected.
  */
 export default function Calendar() {
-  const { courts, hours, settings, pulse, loading } = useSite();
+  const { courts, hours, settings, rates, closures, pulse, loading } = useSite();
   const { query } = useLocation();
   const [sport, setSport] = useState<Sport>(SPORTS.find((s) => s === query.get('sport')) ?? 'pickleball');
   const [busy, setBusy] = useState<Busy[] | null>(null);
@@ -59,10 +60,13 @@ export default function Calendar() {
     const map = new Map<string, { courtId: number; slots: Slot[] }[]>();
     if (!busy) return map;
     for (let d = today; d <= lastDay; d = ymdAdd(d, 1)) {
-      map.set(d, sportCourts.map((c) => ({ courtId: c.id, slots: buildSlots(courtWindow(hours, c.id, d), slotMin, busy, c.id, now) })));
+      map.set(d, sportCourts.map((c) => ({
+        courtId: c.id,
+        slots: closureFor(closures, c.id, d) ? [] : buildSlots(courtWindow(hours, c.id, d), slotMin, busy, c.id, now),
+      })));
     }
     return map;
-  }, [busy, today, lastDay, sportCourts, hours, slotMin, now]);
+  }, [busy, today, lastDay, sportCourts, hours, slotMin, now, closures]);
 
   const summary = (d: string) => {
     const rows = grid.get(d) ?? [];
@@ -88,7 +92,10 @@ export default function Calendar() {
     return [...set].sort((a, b) => a - b);
   }, [dayRows]);
   const daySum = summary(day);
-  const rate = sportCourts.find((c) => c.hourly_rate != null)?.hourly_rate ?? null;
+  const money = (v: number) => fmtMoney(v, settings.currency).replace(/\.00$/, '');
+  const range = rateRange(sportCourts, rates);
+  const dayClosure = sportClosure(closures, sportCourts, day);
+  const prices = priceGroups(sportCourts, rates, dayTypeOf(day));
 
   const book = (courtId: number, start: number) =>
     navigate(`/book?sport=${sport}&date=${day}&court=${courtId}&start=${start}`);
@@ -98,7 +105,7 @@ export default function Calendar() {
       <div className="title-row">
         <div>
           <h1 className="page-title">Court availability</h1>
-          <p className="muted small">Open dates and times for the next month · Philippine time{rate != null ? ` · ${fmtMoney(rate, settings.currency)} per hour` : ''}</p>
+          <p className="muted small">Open dates and times for the next month · Philippine time{range ? ` · ${range.min === range.max ? money(range.min) : `${money(range.min)}–${money(range.max)}`} per hour` : ''}</p>
         </div>
         <div className="chip-row" role="group" aria-label="Sport">
           {SPORTS.map((s) => (
@@ -124,12 +131,13 @@ export default function Calendar() {
                 const inRange = d >= today && d <= lastDay;
                 if (!inRange) return <span key={d} className="cal-day is-out" aria-hidden="true">{dayOfMonth(d)}</span>;
                 const s = summary(d);
+                const k = sportClosure(closures, sportCourts, d);
                 return (
-                  <button key={d} type="button" role="gridcell" className={`cal-day lvl-${s.level}${d === day ? ' is-active' : ''}${d === today ? ' is-today' : ''}`}
-                    onClick={() => setDay(d)} aria-pressed={d === day}
-                    aria-label={`${fmtDateLong(toUtcMs(d, 720))}: ${s.level === 'closed' ? 'closed' : s.open === 0 ? 'fully booked' : `${s.open} open hours`}`}>
+                  <button key={d} type="button" role="gridcell" className={`cal-day lvl-${k ? `closure kind-${k.kind}` : s.level}${d === day ? ' is-active' : ''}${d === today ? ' is-today' : ''}`}
+                    onClick={() => setDay(d)} aria-pressed={d === day} title={k ? `${CLOSURE_LABEL[k.kind]}: ${k.title}` : undefined}
+                    aria-label={`${fmtDateLong(toUtcMs(d, 720))}: ${k ? `${CLOSURE_LABEL[k.kind]}, ${k.title}` : s.level === 'closed' ? 'closed' : s.open === 0 ? 'fully booked' : `${s.open} open hours`}`}>
                     <span className="cal-num">{dayOfMonth(d)}</span>
-                    <span className="cal-meta">{s.level === 'closed' ? '—' : s.open === 0 ? 'Full' : `${Math.round((s.open * slotMin) / 60)}h`}</span>
+                    <span className="cal-meta">{k ? (k.kind === 'event' ? 'Event' : CLOSURE_LABEL[k.kind]) : s.level === 'closed' ? '—' : s.open === 0 ? 'Full' : `${Math.round((s.open * slotMin) / 60)}h`}</span>
                     <span className="cal-bar" style={{ width: `${s.total ? Math.max(8, (s.open / s.total) * 100) : 0}%` }} />
                   </button>
                 );
@@ -140,16 +148,36 @@ export default function Calendar() {
               <li><i className="sw lvl-mid" /> Filling up</li>
               <li><i className="sw lvl-low" /> Few left</li>
               <li><i className="sw lvl-full" /> Full</li>
+              {closures.length > 0 && <li><i className="sw lvl-closure" /> Closed / holiday / event</li>}
             </ul>
           </section>
 
           <section className="card day-card" aria-labelledby="day-h">
             <div className="card-head">
               <h2 id="day-h">{fmtWeekday(day)}, {fmtDateLong(toUtcMs(day, 720)).replace(/^\w+, /, '')}</h2>
-              <span className={`badge ${daySum.open ? 'badge-ok' : 'badge-off'}`}>{daySum.level === 'closed' ? 'Closed' : daySum.open ? `${Math.round((daySum.open * slotMin) / 60)} open hours` : 'Fully booked'}</span>
+              <span className={`badge ${daySum.open ? 'badge-ok' : 'badge-off'}`}>{dayClosure ? CLOSURE_LABEL[dayClosure.kind] : daySum.level === 'closed' ? 'Closed' : daySum.open ? `${Math.round((daySum.open * slotMin) / 60)} open hours` : 'Fully booked'}</span>
             </div>
+            {dayClosure && (
+              <div className={`closure-note kind-${dayClosure.kind}`}>
+                <strong>{CLOSURE_LABEL[dayClosure.kind]}: {dayClosure.title}</strong>
+                <span className="small">{dayClosure.note || 'Online booking is closed for this day. Message Yepjo for details.'}</span>
+              </div>
+            )}
+            {prices.length > 0 && !dayClosure && (
+              <div className="price-list" aria-label="Prices for this day">
+                {prices.map((g) => (
+                  <p key={g.key} className="small">
+                    {prices.length > 1 && <strong>{g.courts}: </strong>}
+                    {g.sets.map((x, i) => (
+                      <span key={i} className="price-set">{x.label} <b>{money(x.rate)}</b></span>
+                    ))}
+                    <span className="muted tiny"> / hour</span>
+                  </p>
+                ))}
+              </div>
+            )}
             {times.length === 0 ? (
-              <p className="muted small">The courts are closed on this day.</p>
+              !dayClosure && <p className="muted small">The courts are closed on this day.</p>
             ) : (
               <>
                 <p className="muted tiny">Tap an open hour to book it.</p>
@@ -168,7 +196,7 @@ export default function Calendar() {
                         const c = sportCourts.find((x) => x.id === r.courtId);
                         return (
                           <tr key={r.courtId}>
-                            <th scope="row" className="board-court">{c?.name}</th>
+                            <th scope="row" className="board-court">{c?.name}{(() => { const k = closureFor(closures, r.courtId, day); return k && !dayClosure ? <small className="board-closure">{CLOSURE_LABEL[k.kind]}</small> : null; })()}</th>
                             {times.map((t) => {
                               const s = r.slots.find((x) => x.start === t);
                               if (!s) return <td key={t} className="cell cell-closed" />;
@@ -202,4 +230,21 @@ export default function Calendar() {
       )}
     </div>
   );
+}
+
+/** Group courts that share the same time sets for a day type, e.g. "Courts 1–4: 7 AM–3 PM ₱250 · 3 PM–1 AM ₱350". */
+function priceGroups(courtList: Court[], rates: CourtRate[], type: 'weekday' | 'weekend') {
+  const groups = new Map<string, { key: string; names: string[]; sets: { label: string; rate: number }[] }>();
+  for (const c of courtList) {
+    const own = rates.filter((r) => r.court_id === c.id && r.day_type === type).sort((a, b) => a.starts.localeCompare(b.starts));
+    const sets = own.length
+      ? own.map((r) => ({ label: `${fmtClock(r.starts)}–${fmtClock(r.ends)}`, rate: Number(r.rate) }))
+      : c.hourly_rate != null ? [{ label: 'All day', rate: Number(c.hourly_rate) }] : [];
+    if (!sets.length) continue;
+    const key = sets.map((x) => `${x.label}=${x.rate}`).join('|');
+    const g = groups.get(key) ?? { key, names: [], sets };
+    g.names.push(c.name);
+    groups.set(key, g);
+  }
+  return [...groups.values()].map((g) => ({ ...g, courts: g.names.join(', ') }));
 }

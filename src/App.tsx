@@ -52,8 +52,8 @@ function useUnreadReplies(userId: string | null): number {
 
 const NAV = [
   { to: '/', label: 'Home', icon: 'home' },
-  { to: '/book', label: 'Book', icon: 'calendar' },
   { to: '/calendar', label: 'Schedule', icon: 'grid' },
+  { to: '/book', label: 'Book', icon: 'calendar' },
   { to: '/bookings', label: 'Bookings', icon: 'ticket' },
   { to: '/chat', label: 'Chat', icon: 'chat' },
   { to: '/account', label: 'Account', icon: 'user' },

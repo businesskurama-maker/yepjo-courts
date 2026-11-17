@@ -3,6 +3,11 @@
 -- Local run:  psql -d <db> -f supabase/tests/verify.sql
 \set ON_ERROR_STOP 1
 begin;
+-- These checks use fixed hours (12 PM–1 AM) and a flat PHP 300/hour; rates_closures.sql covers time-based prices.
+update public.court_hours set opens = '12:00', closes = '01:00', is_closed = false;
+delete from public.court_rates;
+update public.courts set hourly_rate = 300;
+delete from public.closures;
 create schema t;
 
 -- Runs p_sql as the given user (NULL = signed-out guest) with RLS in force.
