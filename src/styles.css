@@ -1363,3 +1363,11 @@ h2 { font-size: 1.05rem; letter-spacing: .07em; }
 /* home carousel: never taller than about a third of a phone/tablet screen */
 @media (max-width: 1023px) { .home-media .carousel { max-height: min(360px, 34vh) !important; } }
 .qr-row .btn-row > .btn { flex: 0 0 auto; }
+
+/* booking: 1-hour range slots (e.g. 8:00 AM – 9:00 AM), tap to add/remove */
+.slot-grid:has(.slot-range) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.slot.slot-range { min-height: 52px; font-size: .8rem; }
+.slot.slot-range span { white-space: nowrap; }
+.slot.slot-range.is-selected { border-radius: 12px; }
+@media (max-width: 380px) { .slot-grid:has(.slot-range) { grid-template-columns: 1fr 1fr; } .slot.slot-range { font-size: .74rem; } }
+.slot.slot-range.is-selected small { color: var(--lime-ink); opacity: .75; }

@@ -185,15 +185,29 @@ export default function Book() {
     setError(null);
     setStep(4);
   };
+  /** Tap hours to add them to the booking (they must be next to each other); tap a selected hour to remove it. */
   const pickSlot = (i: number) => {
     if (slots[i].state !== 'available') return;
-    if (runLength(slots, i) < settings.min_slots) {
-      toast(`The minimum booking is ${fmtDuration(settings.min_slots * slotMin)}; there isn't enough free time from ${fmtTime(slots[i].start)}.`, 'error');
+    setError(null);
+    const fresh = () => { setStart(slots[i].start); setMinutes(slotMin); };
+    if (startIndex < 0 || count < 1) return fresh();
+    const a = startIndex, b = startIndex + count - 1;
+    if (i >= a && i <= b) {
+      if (count === 1) { setStart(null); setMinutes(0); return; }
+      if (i === a) { setStart(slots[a + 1].start); setMinutes((count - 1) * slotMin); return; }
+      setMinutes((i - a) * slotMin);   // tapping a later hour keeps the hours before it
       return;
     }
-    setError(null);
-    setStart(slots[i].start);
-    setMinutes(settings.min_slots * slotMin);
+    const lo = Math.min(a, i), hi = Math.max(b, i);
+    const run = slots.slice(lo, hi + 1);
+    const joined = run.every((x, k) => x.state === 'available' && (k === 0 || run[k - 1].end === x.start));
+    if (!joined) return fresh();
+    if (run.length > settings.max_slots) {
+      toast(`The longest booking is ${fmtDuration(settings.max_slots * slotMin)}.`, 'error');
+      return;
+    }
+    setStart(slots[lo].start);
+    setMinutes(run.length * slotMin);
   };
 
   const savePending = () => {
@@ -344,17 +358,15 @@ export default function Book() {
   const slotButton = (s: Slot) => {
     const i = slots.indexOf(s);
     const selected = startIndex >= 0 && i >= startIndex && i < startIndex + count;
+    const label = `${fmtTime(s.start)} to ${fmtTime(s.end)}, ${selected ? 'selected' : s.state === 'past' ? 'no longer available' : s.state}`;
     const first = selected && i === startIndex;
     const last = selected && i === startIndex + count - 1;
-    const label = `${fmtTime(s.start)} to ${fmtTime(s.end)}, ${selected ? 'selected' : s.state === 'past' ? 'no longer available' : s.state}`;
-    // Each box is a block that starts at the time shown; the last selected box also shows when the booking ends.
-    const note = !selected ? null : count === 1 ? `until ${fmtTime(s.end)}` : first ? 'Start' : last ? `until ${fmtTime(s.end)}` : '✓';
     return (
       <button key={s.start} type="button"
-        className={`slot slot-${s.state}${selected ? ' is-selected' : ''}${first ? ' is-first' : ''}${last ? ' is-last' : ''}`}
+        className={`slot slot-range slot-${s.state}${selected ? ' is-selected' : ''}${first ? ' is-first' : ''}${last ? ' is-last' : ''}`}
         disabled={s.state !== 'available'} aria-pressed={selected} aria-label={label} onClick={() => pickSlot(i)}>
-        <span>{fmtTime(s.start)}</span>
-        <small>{selected ? note : s.state === 'available' ? slotPrice(s.start) : s.state === 'past' ? 'Past' : s.state === 'booked' ? 'Booked' : 'Blocked'}</small>
+        <span>{fmtTime(s.start)} – {fmtTime(s.end)}</span>
+        <small>{s.state === 'available' ? slotPrice(s.start) : s.state === 'past' ? 'Past' : s.state === 'booked' ? 'Booked' : 'Blocked'}</small>
       </button>
     );
   };
@@ -463,7 +475,7 @@ export default function Book() {
       {/* ---------------------------------------------------------- 4. time */}
       {step === 4 && sport && date && court && (
         <section className="card" aria-labelledby="s4">
-          <h2 id="s4">Select time and duration</h2>
+          <h2 id="s4">Select your time</h2>
           <p className="muted small">{SPORT_LABEL[sport]} · {court.name} · {fmtDateLong(toUtcMs(date, 720))}</p>
           {availError && <Notice kind="error" action={<button type="button" className="btn btn-sm" onClick={() => setReloadKey((k) => k + 1)}>Retry</button>}>Availability could not be loaded. {availError}</Notice>}
           {!availReady && !availError && <Spinner label="Checking availability…" />}
@@ -481,7 +493,7 @@ export default function Book() {
                 <li><i className="sw sw-booked" /> Booked</li>
                 <li><i className="sw sw-blocked" /> Blocked</li>
               </ul>
-              <p className="tiny muted">Each box is one hour, starting at the time shown. Prices are per hour.</p>
+              <p className="tiny muted">Tap one or more 1-hour slots in a row. Tap a selected slot again to remove it. Prices are per hour.</p>
               {court && date && hourBlocks(closures, hours, court.id, date).map((b) => (
                 <p key={b.closure.id} className="tiny block-note">
                   <strong>{CLOSURE_LABEL[b.closure.kind]}:</strong> {b.closure.title} · {fmtTime(b.start)}–{fmtTime(b.end)} (not bookable)
@@ -495,20 +507,6 @@ export default function Book() {
                 </>
               )}
 
-              {startIndex >= 0 && (
-                <div className="duration" role="group" aria-label="Duration">
-                  <span className="field-label">Duration</span>
-                  <div className="chip-row">
-                    {Array.from({ length: settings.max_slots - settings.min_slots + 1 }, (_, k) => settings.min_slots + k).map((n) => (
-                      <button key={n} type="button" className={`chip${count === n ? ' is-active' : ''}`} disabled={n > maxRun}
-                        aria-pressed={count === n} onClick={() => setMinutes(n * slotMin)}
-                        title={n > maxRun ? 'The following slot is not available' : undefined}>
-                        {fmtDuration(n * slotMin)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
               {selectionOk && start !== null && end !== null && (
                 <div className="time-summary" aria-live="polite">
                   <div className="time-summary-range">
@@ -525,7 +523,9 @@ export default function Book() {
             <p className="small">
               {selectionOk && start !== null && end !== null
                 ? <><strong>{fmtTime(start)} – {fmtTime(end)}</strong>{endsNextDay ? ` (ends ${fmtDateShort(end)})` : ''} · {fmtDuration(minutes)}</>
-                : <span className="muted">Tap an available start time.</span>}
+                : count > 0 && count < settings.min_slots
+                  ? <span className="warn-text">The minimum booking is {fmtDuration(settings.min_slots * slotMin)}: tap the next hour too.</span>
+                  : <span className="muted">Tap one or more 1-hour slots.</span>}
             </p>
             <button type="button" className="btn btn-primary" disabled={!selectionOk} onClick={() => setStep(5)}>Review</button>
           </div>
