@@ -2,14 +2,13 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { PhotoPicker } from '../components/PhotoPicker';
 import { Confirm, Empty, Field, Icon, Modal, Notice, Spinner, Toggle, useToast } from '../components/ui';
 import { photoUrl, supabase, toAppError } from '../lib/supabase';
-import { fmtMoney } from '../lib/time';
 import type { CafeItem } from '../lib/types';
 import { useSite } from '../state/site';
 import { CafeOrdersAdmin, CafeSettingsCard } from './CafeOrders';
 
 /** Admin: Yepjo Cafe menu (categories, items, prices, photos, availability). */
 export default function CafeAdmin() {
-  const { settings, pulse } = useSite();
+  const { pulse } = useSite();
   const toast = useToast();
   const [rows, setRows] = useState<CafeItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +40,13 @@ export default function CafeAdmin() {
     void load();
   };
   const cats = Array.from(new Set((rows ?? []).map((r) => r.category)));
+  const [mcat, setMcat] = useState<string | null>(null);
+  const [mpage, setMpage] = useState(0);
+  const mlist = (rows ?? []).filter((r) => !mcat || r.category === mcat);
+  const MPER = 12;
+  const mpages = Math.max(1, Math.ceil(mlist.length / MPER));
+  const mp = Math.min(mpage, mpages - 1);
+  const mshown = mlist.slice(mp * MPER, mp * MPER + MPER);
 
   return (
     <div className="stack">
@@ -50,36 +56,54 @@ export default function CafeAdmin() {
         <button type="button" role="tab" aria-selected={tab === 'orders'} className={`tab${tab === 'orders' ? ' is-active' : ''}`} onClick={() => setTab('orders')}>Orders</button>
         <button type="button" role="tab" aria-selected={tab === 'menu'} className={`tab${tab === 'menu' ? ' is-active' : ''}`} onClick={() => setTab('menu')}>Menu</button>
       </div>
-      {tab === 'orders' ? <CafeOrdersAdmin /> : (<>
-      <div className="title-row">
-        <p className="muted small">Shown on the Cafe page. Turn an item off when it runs out today. Items need a price to be ordered online.</p>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> Add item</button>
-      </div>
-      {error && <Notice kind="error">{error}</Notice>}
-      {rows === null && !error && <Spinner />}
-      {rows !== null && rows.length === 0 && <Empty icon="cup" title="No menu items yet">Add food and drinks with Add item.</Empty>}
-      {cats.map((c) => (
-        <section key={c} className="stack-sm">
-          <h2 className="day-head">{c}</h2>
-          <ul className="rows card">
-            {(rows ?? []).filter((r) => r.category === c).map((i) => (
-              <li key={i.id} className="row row-photo">
-                {i.image_path ? <img className="thumb" src={photoUrl(i.image_path)} alt="" /> : <span className="thumb portal-img-art"><Icon name="cup" size={18} /></span>}
-                <span className="row-main">
-                  <strong>{i.name}{i.price != null ? <span className="ok-text"> · {fmtMoney(Number(i.price), settings.currency)}</span> : <span className="badge badge-warn">No price</span>}</strong>
-                  {i.description && <span className="small muted clamp-1">{i.description}</span>}
-                  <Toggle checked={i.is_available} onChange={(v) => void available(i, v)} label={i.is_available ? 'Available' : 'Not available today'} />
+      {tab === 'orders' ? <CafeOrdersAdmin /> : (
+        <section className="stack-sm">
+          <div className="menu-admin-bar">
+            <div className="cafe-tabs" role="tablist" aria-label="Menu category">
+              <button type="button" role="tab" aria-selected={!mcat} className={`chip${!mcat ? ' is-active' : ''}`} onClick={() => { setMcat(null); setMpage(0); }}>All <small>{(rows ?? []).length}</small></button>
+              {cats.map((c) => (
+                <button key={c} type="button" role="tab" aria-selected={mcat === c} className={`chip${mcat === c ? ' is-active' : ''}`} onClick={() => { setMcat(c); setMpage(0); }}>
+                  {c} <small>{(rows ?? []).filter((r) => r.category === c).length}</small>
+                </button>
+              ))}
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> Add item</button>
+          </div>
+          {error && <Notice kind="error">{error}</Notice>}
+          {rows === null && !error && <Spinner />}
+          {rows !== null && rows.length === 0 && <Empty icon="cup" title="No menu items yet">Add food and drinks with Add item.</Empty>}
+          <ul className="menu-admin-grid">
+            {mshown.map((i) => (
+              <li key={i.id} className={`menu-admin-item${i.is_available ? '' : ' is-off'}`}>
+                {i.image_path ? <img className="menu-thumb" src={photoUrl(i.image_path)} alt="" /> : <span className="menu-thumb menu-thumb-art"><Icon name="cup" size={20} /></span>}
+                <span className="menu-admin-text">
+                  <strong className="menu-row-name">{i.name}</strong>
+                  <span className="tiny muted menu-row-desc">{mcat ? (i.description || ' ') : i.category}</span>
+                  <PriceInput item={i} onSaved={() => void load()} />
                 </span>
-                <span className="row-actions">
-                  <button type="button" className="btn btn-sm" onClick={() => setEditing(i)}><Icon name="edit" size={16} /> Edit</button>
-                  <button type="button" className="icon-btn" onClick={() => setRemoving(i)} aria-label={`Remove ${i.name}`}><Icon name="trash" size={18} /></button>
+                <span className="menu-admin-side">
+                  <label className="mini-switch" title={i.is_available ? 'Available today' : 'Sold out today'}>
+                    <input type="checkbox" checked={i.is_available} onChange={(e) => void available(i, e.target.checked)} aria-label={`${i.name} available today`} />
+                    <span className="mini-track" /><span className="tiny">{i.is_available ? 'On' : 'Out'}</span>
+                  </label>
+                  <span className="rw-actions">
+                    <button type="button" className="icon-btn" onClick={() => setEditing(i)} aria-label={`Edit ${i.name}`}><Icon name="edit" size={16} /></button>
+                    <button type="button" className="icon-btn icon-btn-danger" onClick={() => setRemoving(i)} aria-label={`Remove ${i.name}`}><Icon name="trash" size={16} /></button>
+                  </span>
                 </span>
               </li>
             ))}
           </ul>
+          {mpages > 1 && (
+            <nav className="menu-pager" aria-label="Menu pages">
+              <button type="button" className="icon-btn" onClick={() => setMpage(mp - 1)} disabled={mp === 0} aria-label="Previous page"><Icon name="left" size={18} /></button>
+              <span className="pager-count">Page <b>{mp + 1}</b> of {mpages}</span>
+              <button type="button" className="icon-btn" onClick={() => setMpage(mp + 1)} disabled={mp >= mpages - 1} aria-label="Next page"><Icon name="right" size={18} /></button>
+            </nav>
+          )}
+          <p className="tiny muted">Type a price and press Enter to save it. Switch an item to Out when it runs out today. Items without a price can't be ordered online.</p>
         </section>
-      ))}
-      </>)}
+      )}
       {editing && <ItemDialog item={editing === 'new' ? null : editing} categories={cats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
       {removing && (
         <Confirm title={`Remove ${removing.name}?`} confirmLabel="Remove" danger busy={busy} onConfirm={() => void remove()} onClose={() => setRemoving(null)}>
@@ -144,5 +168,32 @@ function ItemDialog({ item, categories, onClose, onSaved }: { item: CafeItem | n
       </form>
       {photo && <PhotoPicker folder="announcements" title="Menu photo" onClose={() => setPhoto(false)} onUploaded={(p) => { set('image_path', p); setPhoto(false); }} />}
     </Modal>
+  );
+}
+
+/** Inline price editor: saves on Enter or when leaving the box. */
+function PriceInput({ item, onSaved }: { item: CafeItem; onSaved: () => void }) {
+  const toast = useToast();
+  const [v, setV] = useState(item.price != null ? String(Number(item.price)) : '');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setV(item.price != null ? String(Number(item.price)) : ''); }, [item.price]);
+  const commit = async () => {
+    const t = v.trim();
+    const price = t === '' ? null : Number(t);
+    if (price !== null && (!Number.isFinite(price) || price < 0)) { toast('Enter a valid price.', 'error'); return; }
+    if (price === (item.price != null ? Number(item.price) : null)) return;
+    setBusy(true);
+    const { error } = await supabase.from('cafe_items').update({ price, updated_at: new Date().toISOString() }).eq('id', item.id);
+    setBusy(false);
+    if (error) return toast(toAppError(error).message, 'error');
+    toast(`${item.name}: ${price == null ? 'price removed' : `₱${price}`}`);
+    onSaved();
+  };
+  return (
+    <span className={`price-input${item.price == null && !v ? ' is-missing' : ''}`}>
+      <span>₱</span>
+      <input type="number" min={0} step="1" inputMode="decimal" value={v} placeholder="Set price" disabled={busy} aria-label={`${item.name} price`}
+        onChange={(e) => setV(e.target.value)} onBlur={() => void commit()} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
+    </span>
   );
 }

@@ -25,6 +25,7 @@ function summarise(rows: CourtHours[]): string {
 export default function Courts() {
   const { courts, hours, settings, reload } = useSite();
   const toast = useToast();
+  const [view, setView] = useState<'courts' | 'closures'>(() => (new URLSearchParams(window.location.search).get('tab') === 'closures' ? 'closures' : 'courts'));
   const [editing, setEditing] = useState<Court | null>(null);
   const [adding, setAdding] = useState<Sport | null>(null);
   const [removing, setRemoving] = useState<Court | null>(null);
@@ -74,7 +75,12 @@ export default function Courts() {
         </Notice>
       )}
 
-      {SPORTS.map((sport) => (
+      <div className="seg-tabs" role="tablist" aria-label="Courts sections">
+        <button type="button" role="tab" aria-selected={view === 'courts'} className={`seg-tab${view === 'courts' ? ' is-active' : ''}`} onClick={() => setView('courts')}><Icon name="court" size={16} /> Courts &amp; prices</button>
+        <button type="button" role="tab" aria-selected={view === 'closures'} className={`seg-tab${view === 'closures' ? ' is-active' : ''}`} onClick={() => setView('closures')}><Icon name="calendar" size={16} /> Closed dates &amp; events</button>
+      </div>
+
+      {view === 'courts' ? <div className="courts-grid">{SPORTS.map((sport) => (
         <section key={sport} className="card" aria-labelledby={`c-${sport}`}>
           <div className="card-head">
             <h2 id={`c-${sport}`}>{SPORT_LABEL[sport]}</h2>
@@ -90,18 +96,16 @@ export default function Courts() {
                   </span>
                 </span>
                 <span className="row-actions">
-                  <button type="button" className="btn btn-sm" onClick={() => setPricing([c.id])}>₱ Prices</button>
-                  <button type="button" className="btn btn-sm" onClick={() => setEditing(c)}><Icon name="edit" size={16} /> Edit</button>
-                  <button type="button" className="icon-btn" onClick={() => setRemoving(c)} aria-label={`Delete ${c.name}`}><Icon name="trash" size={18} /></button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => setPricing([c.id])}>₱ Prices</button>
+                  <button type="button" className="icon-btn" onClick={() => setEditing(c)} aria-label={`Edit ${c.name}`}><Icon name="edit" size={16} /></button>
+                  <button type="button" className="icon-btn icon-btn-danger" onClick={() => setRemoving(c)} aria-label={`Delete ${c.name}`}><Icon name="trash" size={16} /></button>
                 </span>
               </li>
             ))}
             {courts.filter((c) => c.sport === sport).length === 0 && <li className="muted small">No courts yet.</li>}
           </ul>
         </section>
-      ))}
-
-      <Closures />
+      ))}</div> : <Closures />}
 
       {editing && <CourtDialog court={editing} onClose={() => setEditing(null)} />}
       {pricing && <RatesDialog courtIds={pricing} onClose={() => setPricing(null)} />}

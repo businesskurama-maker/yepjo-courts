@@ -78,6 +78,8 @@ export default function Rewards() {
       </header>
       {error && <Notice kind="error">{error}</Notice>}
 
+      <div className="rewards-layout">
+      <div className="rewards-col">
       <section className="member-pass" aria-label="Your member card">
         {!auth.user ? (
           <div className="pass-info">
@@ -136,6 +138,8 @@ export default function Rewards() {
         </section>
       )}
 
+      </div>
+      <div className="rewards-col">
       <section className="stack-sm" aria-labelledby="rw-h">
         <h2 id="rw-h" className="section-h">Rewards</h2>
         {rewards.length === 0 && <p className="muted small">Rewards will be listed here soon.</p>}
@@ -186,6 +190,9 @@ export default function Rewards() {
           </ul>
         </section>
       )}
+
+      </div>
+      </div>
 
       {big && card && (
         <button type="button" className="qr-fullscreen" onClick={() => setBig(false)} aria-label="Close the large QR code">

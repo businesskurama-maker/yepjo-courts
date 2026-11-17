@@ -220,8 +220,30 @@ function Dashboard({ unread, toCheck }: { unread: number; toCheck: number }) {
         </Link>
       </div>
 
+      <div className="dash-grid">
+      <section className="card dash-today" aria-labelledby="today-h">
+        <div className="card-head">
+          <h2 id="today-h">Today's schedule</h2>
+          <Link to={`/admin/bookings?date=${today}`} className="link small">Manage</Link>
+        </div>
+        {rows === null && !error && <Spinner />}
+        {rows !== null && rows.length === 0 && <p className="muted small">Nothing booked for today yet.</p>}
+        <ul className="dash-list">
+          {(rows ?? []).map((r) => (
+            <li key={r.id} className={r.kind === 'block' ? 'is-block' : ''}>
+              <strong className="dash-time">{fmtRange(r.starts_at, r.ends_at)}</strong>
+              <span className="dash-court">{courtName(r.court_id)}</span>
+              <span className="dash-who">
+                {r.kind === 'block' ? <span className="badge badge-off">Blocked</span> : r.customer_name}
+                {r.kind === 'walk_in' && <span className="badge">Walk-in</span>}
+              </span>
+              <span className="muted tiny dash-extra">{r.kind === 'block' ? r.note : r.customer_phone}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
       {pending.length > 0 && (
-        <section className="card" aria-labelledby="need-h">
+        <section className="card dash-need" aria-labelledby="need-h">
           <h2 id="need-h"><Icon name="alert" size={18} /> Needs business input</h2>
           <ul className="check-list">
             {pending.map((p) => (
@@ -231,29 +253,7 @@ function Dashboard({ unread, toCheck }: { unread: number; toCheck: number }) {
         </section>
       )}
 
-      <section className="card" aria-labelledby="today-h">
-        <div className="card-head">
-          <h2 id="today-h">Today's schedule</h2>
-          <Link to={`/admin/bookings?date=${today}`} className="link small">Manage</Link>
-        </div>
-        {rows === null && !error && <Spinner />}
-        {rows !== null && rows.length === 0 && <p className="muted small">Nothing booked for today yet.</p>}
-        <ul className="rows">
-          {(rows ?? []).map((r) => (
-            <li key={r.id} className="row">
-              <span className="row-main">
-                <strong>{fmtRange(r.starts_at, r.ends_at)}</strong>
-                <span className="small">{courtName(r.court_id)}</span>
-              </span>
-              <span className="row-side small">
-                {r.kind === 'block' ? <span className="badge badge-off">Blocked</span> : r.customer_name}
-                {r.kind === 'walk_in' && <span className="badge">Walk-in</span>}
-                <span className="muted tiny">{r.kind === 'block' ? r.note : r.customer_phone}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      </div>
     </div>
   );
 }

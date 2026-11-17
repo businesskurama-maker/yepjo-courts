@@ -16,6 +16,12 @@ interface AdminRow {
 
 const isUrl = (v: string) => v === '' || /^https?:\/\/\S+$/i.test(v);
 
+type SetTab = 'biz' | 'book' | 'cancel' | 'pay' | 'admins' | 'setup';
+const SET_TABS: [SetTab, string, string][] = [
+  ['biz', 'Business', 'home'], ['book', 'Booking rules', 'calendar'], ['cancel', 'Cancellation', 'x'],
+  ['pay', 'Payments', 'qr'], ['admins', 'Administrators', 'shield'], ['setup', 'Setup checklist', 'check'],
+];
+
 export default function SettingsPage() {
   const { settings, reload } = useSite();
   const auth = useAuth();
@@ -53,9 +59,9 @@ export default function SettingsPage() {
   const save = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!form.business_name.trim()) return setError('Enter the business name.');
-    if (!isUrl(form.facebook_url.trim()) || !isUrl(form.reclub_url.trim())) return setError('Links must start with https://');
-    if (form.max_slots < form.min_slots) return setError('The longest booking cannot be shorter than the shortest booking.');
+    if (!form.business_name.trim()) { pickTab('biz'); return setError('Enter the business name.'); }
+    if (!isUrl(form.facebook_url.trim()) || !isUrl(form.reclub_url.trim())) { pickTab('biz'); return setError('Links must start with https://'); }
+    if (form.max_slots < form.min_slots) { pickTab('book'); return setError('The longest booking cannot be shorter than the shortest booking.'); }
     setBusy(true);
     const cleaned: Settings = {
       ...form,
@@ -66,11 +72,11 @@ export default function SettingsPage() {
     };
     if (cleaned.online_payment_enabled && !cleaned.payment_qr_path) {
       setBusy(false);
-      return setError('Upload the payment QR code before turning on online payment.');
+      { pickTab('pay'); return setError('Upload the payment QR code before turning on online payment.'); }
     }
     if (!cleaned.allow_pay_at_venue && !cleaned.online_payment_enabled) {
       setBusy(false);
-      return setError('Keep at least one way to pay: turn on online payment or allow paying at the court.');
+      { pickTab('pay'); return setError('Keep at least one way to pay: turn on online payment or allow paying at the court.'); }
     }
     // Send only the editable columns (never id / updated_at).
     const payload = Object.fromEntries((Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]).map((k) => [k, cleaned[k]]));
@@ -108,18 +114,39 @@ export default function SettingsPage() {
     void loadAdmins();
   };
 
+  const [tab, setTab] = useState<SetTab>(() => {
+    const q = new URLSearchParams(window.location.search).get('tab') as SetTab | null;
+    return q && SET_TABS.some(([k]) => k === q) ? q : 'biz';
+  });
+  const pickTab = (k: SetTab) => {
+    setTab(k);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', k);
+    window.history.replaceState(window.history.state, '', url);
+  };
   const num = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(v) || min)));
 
   return (
-    <div className="stack">
-      <h1 className="page-title">Settings</h1>
-      <form className="stack" onSubmit={save}>
+    <div className="stack settings-page">
+      <div className="settings-head">
+        <h1 className="page-title">Settings</h1>
+        <div className="seg-tabs" role="tablist" aria-label="Settings sections">
+          {SET_TABS.map(([k, label, icon]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} className={`seg-tab${tab === k ? ' is-active' : ''}`} onClick={() => pickTab(k)}>
+              <Icon name={icon} size={16} /> <span>{label}</span>
+              {k === 'pay' && !form.payment_qr_path && <i className="seg-dot" aria-label="Needs attention" />}
+              {k === 'setup' && !(form.hours_confirmed && form.rates_confirmed && form.policy_confirmed) && <i className="seg-dot" aria-label="Needs attention" />}
+            </button>
+          ))}
+        </div>
+      </div>
+      <form className="stack" onSubmit={save} hidden={tab === 'admins'}>
         {error && <Notice kind="error">{error}</Notice>}
 
-        <section className="card" aria-labelledby="set-biz">
+        <section className="card set-panel" aria-labelledby="set-biz" hidden={tab !== 'biz'}>
           <h2 id="set-biz">Business details and links</h2>
           <div className="form">
-            <Field label="Business name"><input type="text" value={form.business_name} onChange={(e) => set('business_name', e.target.value)} maxLength={80} required /></Field>
+            <Field label="Business name"><input type="text" value={form.business_name} onChange={(e) => set('business_name', e.target.value)} maxLength={80} /></Field>
             <Field label="Tagline"><input type="text" value={form.tagline} onChange={(e) => set('tagline', e.target.value)} maxLength={140} /></Field>
             <Field label="Address"><input type="text" value={form.address} onChange={(e) => set('address', e.target.value)} maxLength={200} /></Field>
             <div className="form-2">
@@ -138,7 +165,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="card" aria-labelledby="set-rules">
+        <section className="card set-panel" aria-labelledby="set-rules" hidden={tab !== 'book'}>
           <h2 id="set-rules">Booking rules {!form.policy_confirmed && <span className="badge badge-warn">Needs business input</span>}</h2>
           <div className="form">
             <div className="form-2">
@@ -164,7 +191,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="card" aria-labelledby="set-cancel">
+        <section className="card set-panel" aria-labelledby="set-cancel" hidden={tab !== 'cancel'}>
           <h2 id="set-cancel">Cancellation policy</h2>
           <div className="form">
             <Toggle checked={form.allow_cancellation} onChange={(v) => set('allow_cancellation', v)} label={form.allow_cancellation ? 'Customers can cancel online' : 'Customers cannot cancel online'} />
@@ -183,7 +210,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="card" aria-labelledby="set-pay">
+        <section className="card set-panel" aria-labelledby="set-pay" hidden={tab !== 'pay'}>
           <h2 id="set-pay"><Icon name="qr" size={18} /> Payments {!form.payment_qr_path && <span className="badge badge-warn">QR not uploaded</span>}</h2>
           <div className="form">
             <div className="qr-row">
@@ -219,7 +246,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="card" aria-labelledby="set-confirm">
+        <section className="card set-panel" aria-labelledby="set-confirm" hidden={tab !== 'setup'}>
           <h2 id="set-confirm">Confirmations</h2>
           <p className="muted small">The app launched with placeholder values. Tick each item once the business has confirmed it; the dashboard reminder then disappears.</p>
           <div className="form">
@@ -235,7 +262,7 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      <section className="card" aria-labelledby="set-admins">
+      <section className="card set-panel" aria-labelledby="set-admins" hidden={tab !== 'admins'}>
         <h2 id="set-admins"><Icon name="shield" size={18} /> Administrators</h2>
         <p className="small muted">
           {admins.length <= 1

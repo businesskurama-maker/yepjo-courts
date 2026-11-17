@@ -190,6 +190,7 @@ export default function Reports() {
             <Empty icon="chart" title={`No sales in ${monthLabel(month)}`}>Confirmed bookings and walk-ins will show up here.</Empty>
           ) : (
             <>
+              <div className="report-top">
               <section className="card report-card">
                 <h2 className="report-h">How it was paid</h2>
                 {([
@@ -234,6 +235,7 @@ export default function Reports() {
                   })}
                 </div>
               </section>
+              </div>
 
               <div className="report-grid">
                 <section className="card report-card">

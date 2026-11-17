@@ -23,8 +23,9 @@ export default function Account() {
   };
 
   return (
-    <div className="page page-narrow">
+    <div className="page account-page">
       <h1 className="page-title">Account</h1>
+      <div className="account-grid">
       {error && <Notice kind="error">{error}</Notice>}
 
       {!auth.user ? (
@@ -35,12 +36,13 @@ export default function Account() {
         </div>
       ) : (
         <>
-          <section className="card" aria-labelledby="acc-h">
+          <section className="card account-details" aria-labelledby="acc-h">
             <h2 id="acc-h">Your details</h2>
             {!auth.profileComplete && <Notice kind="warn">Complete your profile to book courts and send inquiries.</Notice>}
             <ProfileForm submitLabel="Save changes" onSaved={() => { toast('Your details were saved.'); navigate('/'); }} />
           </section>
 
+          <div className="account-side">
           <section className="card link-list" aria-label="Shortcuts">
             <Link to="/bookings"><Icon name="ticket" /> My bookings <Icon name="right" size={16} /></Link>
             <Link to="/chat"><Icon name="chat" /> Chat with Yepjo <Icon name="right" size={16} /></Link>
@@ -50,13 +52,20 @@ export default function Account() {
           <button type="button" className="btn btn-ghost btn-block" onClick={async () => { await auth.signOut(); navigate('/'); }}>
             <Icon name="logout" size={18} /> Log out
           </button>
+          <section className="card" aria-labelledby="inst-h">
+            <h2 id="inst-h">Install the app</h2>
+            <InstallCard />
+          </section>
+          </div>
         </>
       )}
-
-      <section className="card" aria-labelledby="inst-h">
-        <h2 id="inst-h">Install the app</h2>
-        <InstallCard />
-      </section>
+      {!auth.user && (
+        <section className="card" aria-labelledby="inst-h">
+          <h2 id="inst-h">Install the app</h2>
+          <InstallCard />
+        </section>
+      )}
+      </div>
     </div>
   );
 }
