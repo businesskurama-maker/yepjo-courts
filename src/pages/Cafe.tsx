@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { PaymentPanel } from '../components/Payment';
 import { Confirm, Empty, GoogleButton, Icon, Modal, Notice, Spinner, useOnline, useToast } from '../components/ui';
 import { Link } from '../lib/router';
@@ -106,7 +106,12 @@ export default function Cafe() {
 
   const orderable = (i: CafeItem) => i.is_available && i.price != null && Number(i.price) > 0;
   const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category))), [items]);
-  const groups = cats.filter((c) => !cat || c === cat).map((c) => [c, (items ?? []).filter((i) => i.category === c)] as const);
+  const curCat = cat && cats.includes(cat) ? cat : cats[0] ?? null;
+  const catItems = useMemo(() => (items ?? []).filter((i) => i.category === curCat), [items, curCat]);
+  const [pg, setPg] = useState(0);
+  const [perPage, setPerPage] = useState(6);
+  const [showOrders, setShowOrders] = useState(false);
+  const gridRef = useRef<HTMLUListElement>(null);
   const money = (v: number) => fmtMoney(v, settings.currency).replace(/\.00$/, '');
   const per = Number(settings.points_purchase_amount ?? 0);
 
@@ -120,7 +125,30 @@ export default function Cafe() {
   });
 
   const active = orders.filter((o) => ['pending', 'paid', 'preparing', 'ready'].includes(o.status));
-  const past = orders.filter((o) => !active.includes(o)).slice(0, 5);
+  const past = orders.filter((o) => !active.includes(o)).slice(0, 10);
+
+  const cartShown = count > 0 && canOrder;
+  // Fit the menu to the window: as many rows as fit above the pager / cart bar, no page scrolling.
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = gridRef.current;
+      if (!el) return;
+      const nav = document.querySelector<HTMLElement>('.bottomnav');
+      const navH = nav && getComputedStyle(nav).display !== 'none' ? nav.offsetHeight : 0;
+      const w = el.clientWidth;
+      const cols = w >= 980 ? 3 : w >= 560 ? 2 : 1;
+      const avail = window.innerHeight - el.getBoundingClientRect().top - navH - 44 - (cartShown ? 72 : 0) - 10;
+      const rows = Math.max(2, Math.floor((avail + 8) / 82));
+      setPerPage(rows * cols);
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [items, active.length, curCat, canOrder, cartShown]);
+  const pages = Math.max(1, Math.ceil(catItems.length / perPage));
+  const pageNo = Math.min(pg, pages - 1);
+  const shown = catItems.slice(pageNo * perPage, pageNo * perPage + perPage);
+  const pickCat = (c: string) => { setCat(c); setPg(0); };
 
   const cancelOrder = async () => {
     if (!cancelling) return;
@@ -136,95 +164,112 @@ export default function Cafe() {
 
   return (
     <div className="page portal cafe-page">
-      <header className="cafe-hero card">
-        <img src="/photos/cafe/cafe-logo.webp" alt="" className="cafe-logo" width={84} height={84} />
-        <div className="cafe-hero-text">
-          <p className="eyebrow">By the courts</p>
+      <header className="cafe-bar card">
+        <img src="/photos/cafe/cafe-logo.webp" alt="" className="cafe-logo" width={52} height={52} />
+        <div className="cafe-bar-text">
           <h1 className="page-title">Yepjo Cafe</h1>
-          <p className="muted small">All-day breakfast, iced coffee and fresh bread. Order ahead and pick it up hot.</p>
           <div className="badge-row">
-            <span className={`badge ${isOpen ? 'badge-ok' : 'badge-off'}`}><Icon name="clock" size={14} /> {isOpen ? 'Open now' : 'Closed now'} · {opens.slice(0, 5) === closes.slice(0, 5) ? 'open all day' : `${clockLabel(opens)} – ${clockLabel(closes)}`}</span>
+            <span className={`badge ${isOpen ? 'badge-ok' : 'badge-off'}`}><Icon name="clock" size={13} /> {isOpen ? 'Open now' : 'Closed now'} · {opens.slice(0, 5) === closes.slice(0, 5) ? 'open all day' : `${clockLabel(opens)} – ${clockLabel(closes)}`}</span>
             {settings.rewards_enabled && per > 0 && (
-              <Link to="/rewards" className="badge badge-gift cafe-points"><Icon name="gift" size={14} /> 1 point per {money(per)}</Link>
+              <Link to="/rewards" className="badge badge-gift cafe-points"><Icon name="gift" size={13} /> 1 pt per {money(per)}</Link>
             )}
+            {!canOrder && items && items.length > 0 && <span className="badge">Order at the counter</span>}
           </div>
         </div>
+        {userId && orders.length > 0 && (
+          <button type="button" className={`btn btn-sm ${active.some((o) => o.status === 'ready') ? 'btn-primary' : 'btn-outline'}`} onClick={() => setShowOrders(true)} aria-label="My orders">
+            <Icon name="list" size={16} /> <span className="hide-sm">My orders</span>{active.length ? <span className="order-count">{active.length}</span> : ''}
+          </button>
+        )}
       </header>
 
       {active.length > 0 && (
-        <section className="stack-sm" aria-labelledby="my-orders-h">
-          <h2 id="my-orders-h" className="section-h">Your orders</h2>
-          <ul className="order-list">
-            {active.map((o) => <OrderCard key={o.id} o={o} money={money} onPay={() => setPaying(o)} onCancel={() => setCancelling(o)} />)}
-          </ul>
-        </section>
+        <ul className="order-strip" aria-label="Your current orders">
+          {active.map((o) => {
+            const b = orderBadge(o);
+            return (
+              <li key={o.id}>
+                <button type="button" className={`order-chip status-${o.status}`} onClick={() => (o.status === 'pending' ? setPaying(o) : setShowOrders(true))}>
+                  <strong>{o.reference}</strong><span className={`badge ${b.cls}`}>{b.text}</span>
+                  {o.status === 'pending' && o.payment_status !== 'submitted' && <span className="link small">Pay now</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
-      {!canOrder && items && items.length > 0 && (
-        <Notice kind="info">Online ordering is not open right now. You can still order at the counter.</Notice>
-      )}
       {error && <Notice kind="error">{error}</Notice>}
       {items === null && !error && <Spinner label="Loading the menu…" />}
       {items !== null && items.length === 0 && <Empty icon="cup" title="Menu coming soon">Ask at the counter for today's food and drinks.</Empty>}
 
-      {cats.length > 1 && (
-        <div className="chip-row cafe-cats" role="radiogroup" aria-label="Category">
-          <button type="button" role="radio" aria-checked={!cat} className={`chip${!cat ? ' is-active' : ''}`} onClick={() => setCat(null)}>All</button>
+      {cats.length > 0 && (
+        <div className="cafe-tabs" role="tablist" aria-label="Menu category">
           {cats.map((c) => (
-            <button key={c} type="button" role="radio" aria-checked={cat === c} className={`chip${cat === c ? ' is-active' : ''}`} onClick={() => setCat(c)}>{c}</button>
+            <button key={c} type="button" role="tab" aria-selected={curCat === c} className={`chip${curCat === c ? ' is-active' : ''}`} onClick={() => pickCat(c)}>
+              {c} <small>{(items ?? []).filter((i) => i.category === c).length}</small>
+            </button>
           ))}
         </div>
       )}
 
-      {groups.map(([c, list]) => (
-        <section key={c} className="stack-sm" aria-label={c}>
-          <h2 className="section-h">{c}</h2>
-          <ul className="food-grid">
-            {list.map((i) => {
-              const qty = cart[i.id] ?? 0;
-              const can = canOrder && orderable(i);
-              const later = /from \d/i.test(i.description ?? '');
-              return (
-                <li key={i.id} className={`food-card${i.is_available ? '' : ' is-out'}${qty ? ' in-cart' : ''}`}>
-                  <span className="food-media">
-                    {i.image_path
-                      ? <img src={photoUrl(i.image_path)} alt="" loading="lazy" decoding="async" />
-                      : <span className="food-art" aria-hidden="true"><Icon name="cup" size={34} /></span>}
-                    {!i.is_available && <span className="food-flag">Sold out today</span>}
-                    {i.is_available && later && <span className="food-flag is-info">{i.description}</span>}
+      {curCat && (
+        <ul ref={gridRef} className="menu-rows" aria-label={curCat}>
+          {shown.map((i) => {
+            const qty = cart[i.id] ?? 0;
+            const can = canOrder && orderable(i);
+            const later = /from \d/i.test(i.description ?? '');
+            return (
+              <li key={i.id} className={`menu-row${i.is_available ? '' : ' is-out'}${qty ? ' in-cart' : ''}`}>
+                {i.image_path
+                  ? <img src={photoUrl(i.image_path)} alt="" loading="lazy" decoding="async" className="menu-thumb" />
+                  : <span className="menu-thumb menu-thumb-art" aria-hidden="true"><Icon name="cup" size={22} /></span>}
+                <span className="menu-row-text">
+                  <strong className="menu-row-name">{i.name}</strong>
+                  {!i.is_available
+                    ? <span className="tiny warn-text">Sold out today</span>
+                    : i.description && <span className={`tiny ${later ? 'menu-later' : 'muted'} menu-row-desc`}>{i.description}</span>}
+                  <span className="menu-row-price">{i.price != null ? money(Number(i.price)) : <span className="muted tiny">Ask at counter</span>}</span>
+                </span>
+                {can && (qty === 0 ? (
+                  <button type="button" className="icon-btn menu-add" onClick={() => setQty(i.id, 1)} aria-label={`Add ${i.name}`}><Icon name="plus" size={18} /></button>
+                ) : (
+                  <span className="qty-stepper is-compact" role="group" aria-label={`${i.name} quantity`}>
+                    <button type="button" onClick={() => setQty(i.id, qty - 1)} aria-label="One less">−</button>
+                    <output aria-live="polite">{qty}</output>
+                    <button type="button" onClick={() => setQty(i.id, qty + 1)} aria-label="One more" disabled={qty >= 20}>+</button>
                   </span>
-                  <span className="food-body">
-                    <strong className="food-name">{i.name}</strong>
-                    {i.description && !later && <span className="small muted food-desc">{i.description}</span>}
-                    <span className="food-foot">
-                      <span className="portal-price">{i.price != null ? money(Number(i.price)) : <span className="muted small">Ask at counter</span>}</span>
-                      {can && (qty === 0 ? (
-                        <button type="button" className="btn btn-sm btn-primary" onClick={() => setQty(i.id, 1)} aria-label={`Add ${i.name}`}>
-                          <Icon name="plus" size={16} /> Add
-                        </button>
-                      ) : (
-                        <span className="qty-stepper" role="group" aria-label={`${i.name} quantity`}>
-                          <button type="button" onClick={() => setQty(i.id, qty - 1)} aria-label="One less">−</button>
-                          <output aria-live="polite">{qty}</output>
-                          <button type="button" onClick={() => setQty(i.id, qty + 1)} aria-label="One more" disabled={qty >= 20}>+</button>
-                        </span>
-                      ))}
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+                ))}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-      {past.length > 0 && (
-        <section className="stack-sm" aria-labelledby="past-orders-h">
-          <h2 id="past-orders-h" className="section-h">Past orders</h2>
-          <ul className="order-list">
-            {past.map((o) => <OrderCard key={o.id} o={o} money={money} />)}
-          </ul>
-        </section>
+      {pages > 1 && (
+        <nav className="menu-pager" aria-label="Menu pages">
+          <button type="button" className="icon-btn" onClick={() => setPg(pageNo - 1)} disabled={pageNo === 0} aria-label="Previous page"><Icon name="left" size={18} /></button>
+          {pages > 6 ? <span className="pager-count">Page <b>{pageNo + 1}</b> of {pages}</span> : Array.from({ length: pages }, (_, n) => (
+            <button key={n} type="button" className={`pager-dot${n === pageNo ? ' is-active' : ''}`} onClick={() => setPg(n)} aria-label={`Page ${n + 1}`} aria-current={n === pageNo ? 'page' : undefined}>{n + 1}</button>
+          ))}
+          <button type="button" className="icon-btn" onClick={() => setPg(pageNo + 1)} disabled={pageNo >= pages - 1} aria-label="Next page"><Icon name="right" size={18} /></button>
+        </nav>
+      )}
+
+      {showOrders && (
+        <Modal title="My cafe orders" onClose={() => setShowOrders(false)}>
+          <div className="stack-sm">
+            {active.length > 0 && (
+              <ul className="order-list order-list-1">
+                {active.map((o) => <OrderCard key={o.id} o={o} money={money} onPay={() => { setShowOrders(false); setPaying(o); }} onCancel={() => setCancelling(o)} />)}
+              </ul>
+            )}
+            {past.length > 0 && <h3 className="section-h">Past orders</h3>}
+            <ul className="order-list order-list-1">
+              {past.map((o) => <OrderCard key={o.id} o={o} money={money} />)}
+            </ul>
+          </div>
+        </Modal>
       )}
 
       {count > 0 && canOrder && (

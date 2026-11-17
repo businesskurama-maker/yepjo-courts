@@ -1112,3 +1112,52 @@ select option:disabled { color: #6b7280; }
 .class-card { grid-template-columns: 84px 1fr auto; }
 .class-time strong { white-space: nowrap; }
 @media (max-width: 480px) { .class-card { grid-template-columns: 76px 1fr; } }
+
+/* ---------------------------------------------------------- cafe: compact, fits the window */
+.main:has(> .cafe-page) { padding-bottom: 0; }
+.cafe-page { padding-bottom: 0; gap: 10px; }
+.cafe-bar { flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px;
+  background: radial-gradient(circle at 0% 0%, rgba(198, 244, 50, .12), transparent 55%), var(--surface); }
+.cafe-bar .cafe-logo { width: 52px; height: 52px; padding: 3px; box-shadow: 0 0 0 2px rgba(198, 244, 50, .35); }
+.cafe-bar-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.cafe-bar-text .page-title { margin: 0; font-size: 1.2rem; line-height: 1.1; }
+.cafe-bar-text .page-title::after { display: none; }
+.cafe-bar > .btn { flex: none; }
+@media (max-width: 480px) { .cafe-bar { padding: 8px 10px; gap: 10px; } .cafe-bar .cafe-logo { width: 42px; height: 42px; } .cafe-bar > .btn { padding: 6px 10px; } }
+.order-strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.order-strip::-webkit-scrollbar { display: none; }
+.order-chip { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; font-size: .85rem; }
+.order-chip.status-ready { border-color: var(--lime); }
+.cafe-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.cafe-tabs::-webkit-scrollbar { display: none; }
+.cafe-tabs .chip { white-space: nowrap; }
+.cafe-tabs .chip small { opacity: .6; margin-left: 4px; font-weight: 600; }
+.menu-rows { display: grid; gap: 8px; grid-template-columns: 1fr; align-content: start; }
+@media (min-width: 560px) { .menu-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 980px) { .menu-rows { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.menu-row { display: grid; grid-template-columns: 58px 1fr auto; gap: 10px; align-items: center; height: 74px; padding: 8px 10px 8px 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.menu-row.in-cart { border-color: var(--lime); }
+.menu-row.is-out { opacity: .55; }
+.menu-thumb { width: 58px; height: 58px; border-radius: 10px; object-fit: cover; display: block; }
+.menu-thumb-art { display: grid; place-items: center; color: var(--lime); background: rgba(198, 244, 50, .08); }
+.menu-row-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.menu-row-name { font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-row-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-later { color: var(--lime); font-weight: 600; }
+.menu-row-price { font-weight: 800; color: var(--lime); font-size: .92rem; }
+.menu-add { border: 1px solid var(--lime); color: var(--lime); border-radius: 50%; width: 36px; height: 36px; }
+.qty-stepper.is-compact button { width: 28px; height: 30px; font-size: 1rem; }
+.qty-stepper.is-compact output { min-width: 18px; }
+.menu-pager { display: flex; align-items: center; justify-content: center; gap: 6px; flex: none; }
+.pager-dot { min-width: 32px; height: 32px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.pager-dot.is-active { background: var(--lime); color: var(--lime-ink); border-color: var(--lime); }
+.order-list-1 { grid-template-columns: 1fr !important; }
+.cafe-page ~ .cart-bar, .cart-bar { bottom: calc(var(--bottomnav) + env(safe-area-inset-bottom) + 8px); }
+@media (min-width: 860px) { .cart-bar { bottom: 14px; } }
+.pager-count { font-size: .85rem; color: var(--muted); min-width: 92px; text-align: center; }
+.pager-count b { color: var(--lime); }
+@media (max-width: 480px) { .cafe-bar .hide-sm { display: none; } .cafe-bar .badge-row { gap: 4px; } }
+.order-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: var(--lime-ink); color: var(--lime); font-size: .72rem; margin-left: 4px; }
+.btn-outline .order-count { background: var(--lime); color: var(--lime-ink); }
+.cafe-bar .badge { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
