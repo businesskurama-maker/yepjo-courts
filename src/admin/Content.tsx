@@ -5,6 +5,7 @@ import { removePhoto } from '../lib/image';
 import { photoUrl, supabase, toAppError } from '../lib/supabase';
 import { fmtDateMed } from '../lib/time';
 import type { Announcement, CarouselPhoto } from '../lib/types';
+import { useSite } from '../state/site';
 
 // ====================================================================== announcements
 export function Announcements() {
@@ -264,7 +265,8 @@ export function Photos() {
         <h1 className="page-title">Carousel photos</h1>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><Icon name="plus" size={16} /> Add photo</button>
       </div>
-      <p className="muted small">Every photo is converted to WebP and compressed to 300 KB or less automatically before it is stored.</p>
+      <p className="muted small">Every photo is converted to WebP and compressed to 300 KB or less automatically before it is stored. Crop wide, square or portrait (vertical) photos; portrait photos are shown whole on the home page.</p>
+      <SlideTiming />
       {error && <Notice kind="error">{error}</Notice>}
       {rows === null && !error && <Spinner />}
       {rows !== null && list.length === 0 && <Empty icon="image" title="No photos yet">Add photos of the courts to feature them on the home page.</Empty>}
@@ -339,5 +341,36 @@ function CaptionDialog({ photo, onClose, onSaved }: { photo: CarouselPhoto; onCl
         <button type="submit" className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
       </form>
     </Modal>
+  );
+}
+
+function SlideTiming() {
+  const { settings, reload } = useSite();
+  const toast = useToast();
+  const [secs, setSecs] = useState(String(settings.carousel_seconds ?? 6));
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setSecs(String(settings.carousel_seconds ?? 6)); }, [settings.carousel_seconds]);
+  const n = Number(secs);
+  const valid = Number.isInteger(n) && n >= 2 && n <= 60;
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    setBusy(true);
+    const { error } = await supabase.from('settings').update({ carousel_seconds: n }).eq('id', true);
+    setBusy(false);
+    if (error) return toast(toAppError(error).message, 'error');
+    toast(`Each photo now shows for ${n} seconds.`);
+    void reload();
+  };
+  return (
+    <form className="card slide-timing" onSubmit={save}>
+      <label htmlFor="slide-secs"><strong>Time per photo</strong> <span className="muted small">(2–60 seconds)</span></label>
+      <div className="slide-timing-row">
+        <input id="slide-secs" type="range" min={2} max={20} step={1} value={Math.min(20, Math.max(2, n || 6))} onChange={(e) => setSecs(e.target.value)} aria-label="Seconds per photo slider" />
+        <input type="number" min={2} max={60} value={secs} onChange={(e) => setSecs(e.target.value)} aria-label="Seconds per photo" className="secs-input" aria-invalid={!valid} />
+        <span className="small muted">sec</span>
+        <button type="submit" className="btn btn-sm btn-primary" disabled={busy || !valid || n === settings.carousel_seconds}>{busy ? 'Saving…' : 'Save'}</button>
+      </div>
+    </form>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, toAppError } from '../lib/supabase';
 import { useAuth } from '../state/auth';
 import { Field, Notice } from './ui';
@@ -15,6 +15,13 @@ export function ProfileForm({ submitLabel, onSaved }: { submitLabel: string; onS
   const [name, setName] = useState(profile?.full_name ?? googleName ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
   const [touched, setTouched] = useState(false);
+  const [edited, setEdited] = useState(false);
+  // The saved profile can arrive after the form opens: fill it in unless the person already typed.
+  useEffect(() => {
+    if (edited || !profile) return;
+    if (profile.full_name) setName(profile.full_name);
+    if (profile.phone) setPhone(profile.phone);
+  }, [profile, edited]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -46,10 +53,10 @@ export function ProfileForm({ submitLabel, onSaved }: { submitLabel: string; onS
       {error && <Notice kind="error">{error}</Notice>}
       {saved && !onSaved && <Notice kind="ok">Your details were saved.</Notice>}
       <Field label="Full name" error={touched ? nameError : null}>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={80} required aria-invalid={touched && !!nameError} />
+        <input type="text" value={name} onChange={(e) => { setEdited(true); setName(e.target.value); }} autoComplete="name" maxLength={80} required aria-invalid={touched && !!nameError} />
       </Field>
       <Field label="Contact number" hint="Mobile number we can reach you on about your booking." error={touched ? phoneError : null}>
-        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" inputMode="tel" placeholder="0917 123 4567" maxLength={20} required aria-invalid={touched && !!phoneError} />
+        <input type="tel" value={phone} onChange={(e) => { setEdited(true); setPhone(e.target.value); }} autoComplete="tel" inputMode="tel" placeholder="0917 123 4567" maxLength={20} required aria-invalid={touched && !!phoneError} />
       </Field>
       <Field label="Email address" hint="From your Google account. It cannot be changed here.">
         <input type="email" value={user?.email ?? profile?.email ?? ''} readOnly aria-readonly="true" />

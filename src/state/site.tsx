@@ -28,6 +28,12 @@ export const DEFAULT_SETTINGS: Settings = {
   payment_qr_path: null,
   payment_instructions: '',
   payment_hold_minutes: 30,
+  carousel_seconds: 6,
+  rewards_enabled: true,
+  points_court_hours: 3,
+  points_purchase_amount: 200,
+  points_dance_booking: 1,
+  points_event: 0,
 };
 
 interface SiteState {
@@ -65,7 +71,7 @@ export function SiteProvider({ children }: { children: ReactNode }) {
         supabase.from('courts').select('id,sport,name,sort_order,is_active,hourly_rate').order('sort_order').order('id'),
         supabase.from('court_hours').select('court_id,dow,opens,closes,is_closed'),
         supabase.from('court_rates').select('id,court_id,day_type,starts,ends,rate').order('starts'),
-        supabase.from('closures').select('id,starts_on,ends_on,court_ids,kind,title,note')
+        supabase.from('closures').select('id,starts_on,ends_on,court_ids,kind,title,note,start_time,end_time')
           .gte('ends_on', ymdAdd(todayYmd(), -1)).order('starts_on'),
       ]);
       // Prices and closures are optional extras: if they cannot load, booking still works with the court's default rate.

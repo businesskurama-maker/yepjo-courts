@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { photoUrl, supabase, toAppError } from '../lib/supabase';
 import { fmtMoney, fmtTime } from '../lib/time';
-import { awaitingPayment, type Reservation } from '../lib/types';
+import { type Reservation } from '../lib/types';
 import { useSite } from '../state/site';
 import { Icon, Notice, useOnline } from './ui';
 
@@ -36,13 +36,27 @@ export function bookingBadge(r: Reservation, past: boolean): { text: string; cls
  * Online QR payment for a pending booking: shows the QR, amount, instructions and a
  * countdown, and collects the last 6 digits of the payment reference.
  */
-export function PaymentPanel({ booking, onChange }: { booking: Reservation; onChange: (r: Reservation) => void }) {
+/** Anything paid by QR: a court booking or an event / class sign-up. */
+export interface Payable {
+  id: string;
+  status: string;
+  payment_status?: string;
+  payment_ref?: string | null;
+  payment_note?: string | null;
+  hold_expires_at?: string | null;
+  amount: number | null;
+}
+
+export function PaymentPanel<T extends Payable>({ booking, onChange, rpc = 'submit_payment', what = 'booking' }: {
+  booking: T; onChange: (r: T) => void; rpc?: 'submit_payment' | 'submit_registration_payment'; what?: string;
+}) {
   const { settings } = useSite();
   const online = useOnline();
   const [ref, setRef] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const countdown = useCountdown(awaitingPayment(booking) ? booking.hold_expires_at : null);
+  const waiting = booking.status === 'pending' && (booking.payment_status === 'unpaid' || booking.payment_status === 'rejected');
+  const countdown = useCountdown(waiting ? booking.hold_expires_at : null);
   const expired = countdown !== null && countdown.left === 0;
 
   if (booking.status !== 'pending') return null;
@@ -53,7 +67,7 @@ export function PaymentPanel({ booking, onChange }: { booking: Reservation; onCh
         <Icon name="clock" size={22} />
         <div>
           <strong>Payment sent: reference ending {booking.payment_ref}</strong>
-          <p className="small muted">Yepjo will check your payment and confirm the booking. Your court is held meanwhile. This page updates by itself.</p>
+          <p className="small muted">Yepjo will check your payment and confirm your {what}. Your place is held meanwhile. This page updates by itself.</p>
         </div>
       </div>
     );
@@ -65,11 +79,11 @@ export function PaymentPanel({ booking, onChange }: { booking: Reservation; onCh
     if (digits.length !== 6) return setError('Enter exactly the last 6 digits of the reference number.');
     setBusy(true);
     setError(null);
-    const { data, error: err } = await supabase.rpc('submit_payment', { p_id: booking.id, p_ref: digits });
+    const { data, error: err } = await supabase.rpc(rpc, { p_id: booking.id, p_ref: digits });
     setBusy(false);
     if (err) return setError(toAppError(err).message);
-    const saved = data as Reservation;
-    if (saved.status === 'cancelled') setError('The payment time for this booking ran out and the court was released. Please book again.');
+    const saved = data as T;
+    if (saved.status === 'cancelled') setError(`The payment time for this ${what} ran out and the place was released. Please try again.`);
     onChange(saved);
   };
 
@@ -97,7 +111,7 @@ export function PaymentPanel({ booking, onChange }: { booking: Reservation; onCh
           <li>Scan the QR with GCash, Maya or your bank app{amount ? <> and pay <strong className="ok-text">{amount}</strong></> : ''}.</li>
           {settings.payment_instructions && <li className="pay-note">{settings.payment_instructions}</li>}
           <li>Type the <strong>last 6 digits</strong> of the reference number from your receipt.</li>
-          <li>Yepjo confirms it, and your booking becomes <strong>Confirmed</strong>.</li>
+          <li>Yepjo confirms it, and your {what} becomes <strong>Confirmed</strong>.</li>
         </ol>
       </div>
       {error && <Notice kind="error">{error}</Notice>}
@@ -112,7 +126,7 @@ export function PaymentPanel({ booking, onChange }: { booking: Reservation; onCh
         </button>
       </div>
       {booking.hold_expires_at && !expired && (
-        <p className="tiny muted">Unpaid bookings are released at {fmtTime(booking.hold_expires_at)}.</p>
+        <p className="tiny muted">If unpaid, this {what} is released at {fmtTime(booking.hold_expires_at)}.</p>
       )}
     </form>
   );

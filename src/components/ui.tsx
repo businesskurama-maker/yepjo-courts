@@ -1,3 +1,4 @@
+import { getKeepSignedIn, setKeepSignedIn } from '../lib/supabase';
 import {
   createContext, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore,
   type ReactNode,
@@ -49,6 +50,13 @@ const PATHS: Record<string, string> = {
   badminton: 'M12 21.500a2.500 2.500 0 0 0 2.500-2.500h-5a2.500 2.500 0 0 0 2.500 2.500zM9.500 19L5.500 4.500h13L14.500 19M9.200 4.500L11 19M14.800 4.500L13 19M7 10h10',
   bolt: 'M13 3L5 13.500h6L10 21l8-10.500h-6z',
   chart: 'M4 20h16M7 16v-5M12 16V6M17 16v-8',
+  cup: 'M5 8h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5zM16 9h1.5a2.5 2.5 0 0 1 0 5H16M8 3v2M11 3v2M14 3v2M4 21h14',
+  gift: 'M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5.5-3.5-5.5-1S9.5 7 12 7zM12 7c1.5-3 5.5-3.5 5.5-1S14.5 7 12 7z',
+  trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4',
+  dance: 'M13 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM9 21l2-6 2 2v4M7 12l3-4 4 2 3-3M11 15l-2-3M3 21h18',
+  more: 'M3.5 12a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0M10.4 12a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0M17.3 12a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0',
+  scan: 'M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16',
+  star: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z',
   print: 'M7 9V4h10v5M7 17H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M7 14h10v6H7z',
   qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2zM16 16h2v2h-2z',
 };
@@ -269,8 +277,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 // ---------------------------------------------------------------- Google button
 export function GoogleButton({ onClick, busy, label = 'Continue with Google' }: { onClick: () => void; busy?: boolean; label?: string }) {
+  const [keep, setKeep] = useState(getKeepSignedIn);
   return (
-    <button type="button" className="btn btn-google" onClick={onClick} disabled={busy}>
+    <div className="google-signin">
+    <button type="button" className="btn btn-google" onClick={() => { setKeepSignedIn(keep); onClick(); }} disabled={busy}>
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.500c3.500 0 6.600 1.200 9.100 3.600l6.800-6.800C35.800 2.400 30.300 0 24 0 14.600 0 6.500 5.400 2.600 13.200l7.900 6.100C12.400 13.600 17.700 9.500 24 9.500z" />
         <path fill="#4285F4" d="M46.500 24.500c0-1.600-.100-3.100-.400-4.500H24v9h12.700c-.600 3-2.300 5.500-4.800 7.200l7.700 6c4.500-4.200 6.900-10.300 6.900-17.700z" />
@@ -279,5 +289,10 @@ export function GoogleButton({ onClick, busy, label = 'Continue with Google' }: 
       </svg>
       {busy ? 'Opening Google…' : label}
     </button>
+    <label className="keep-signed-in">
+      <input type="checkbox" checked={keep} onChange={(e) => { setKeep(e.target.checked); setKeepSignedIn(e.target.checked); }} />
+      <span>Keep me signed in</span>
+    </label>
+    </div>
   );
 }

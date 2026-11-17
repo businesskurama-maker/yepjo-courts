@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { MySignups } from '../components/MySignups';
 import { Confirm, Empty, GoogleButton, Icon, Notice, Pager, Spinner, useOnline, useToast } from '../components/ui';
 import { Link } from '../lib/router';
 import { supabase, toAppError } from '../lib/supabase';
@@ -141,6 +142,7 @@ export default function MyBookings() {
         })}
       </ul>
       <Pager page={page} pageSize={PAGE_SIZE} total={list.length} onPage={setPage} />
+      <MySignups tab={tab} />
 
       {target && (
         <Confirm title="Cancel this booking?" confirmLabel="Cancel booking" danger busy={busy} onConfirm={() => void cancel()} onClose={() => setTarget(null)}>

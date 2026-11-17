@@ -7,7 +7,7 @@ import {
   fmtWeekday, runLength, toUtcMs, todayYmd, ymdAdd, ymdAddMonth, ymdOf, type Slot,
 } from '../lib/time';
 import { CLOSURE_LABEL, SPORTS, SPORT_LABEL, type Busy, type Court, type Reservation, type Sport } from '../lib/types';
-import { closureFor, dayTypeOf as dayTypeOfDate, priceFor, rateAt, rateRange, sportClosure } from '../lib/pricing';
+import { closureFor, dayTypeOf as dayTypeOfDate, hourBlocks, hourBlocksAsBusy, priceFor, rateAt, rateRange, sportClosure } from '../lib/pricing';
 import { RETURN_KEY, useAuth } from '../state/auth';
 import { PaymentPanel } from '../components/Payment';
 import { useSite } from '../state/site';
@@ -142,7 +142,7 @@ export default function Book() {
   const slotsFor = useCallback(
     (id: number): Slot[] =>
       date && availReady && !closureFor(closures, id, date)
-        ? buildSlots(courtWindow(hours, id, date), slotMin, avail!.busy, id, now)
+        ? buildSlots(courtWindow(hours, id, date), slotMin, avail!.busy.concat(hourBlocksAsBusy(closures, hours, [id], date, 0)), id, now)
         : [],
     [date, availReady, avail, hours, slotMin, now, closures],
   );
@@ -391,6 +391,11 @@ export default function Book() {
                 </button>
               );
             })}
+            <Link to="/dance" className="sport-card sport-dance">
+              <span className="sport-icon"><Icon name="dance" size={28} /></span>
+              <span className="sport-name">Step Up Dance</span>
+              <span className="sport-meta">Book a class <Icon name="right" size={16} /></span>
+            </Link>
           </div>
         </section>
       )}
@@ -472,6 +477,11 @@ export default function Book() {
                 <li><i className="sw sw-blocked" /> Blocked</li>
               </ul>
               <p className="tiny muted">Prices shown are per hour.</p>
+              {court && date && hourBlocks(closures, hours, court.id, date).map((b) => (
+                <p key={b.closure.id} className="tiny block-note">
+                  <strong>{CLOSURE_LABEL[b.closure.kind]}:</strong> {b.closure.title} · {fmtTime(b.start)}–{fmtTime(b.end)} (not bookable)
+                </p>
+              ))}
               <div className="slot-grid">{sameDaySlots.map(slotButton)}</div>
               {nextDaySlots.length > 0 && (
                 <>

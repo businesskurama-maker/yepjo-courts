@@ -18,7 +18,14 @@ const ASPECTS: { label: string; value: number | null }[] = [
   { label: 'Wide 16:9', value: 16 / 9 },
   { label: '4:3', value: 4 / 3 },
   { label: 'Square', value: 1 },
+  { label: 'Portrait 4:5', value: 4 / 5 },
+  { label: 'Tall 9:16', value: 9 / 16 },
   { label: 'Original', value: null },
+];
+const SIZES = [
+  { label: 'Large', value: 1920, hint: 'Sharpest (TV, laptop)' },
+  { label: 'Medium', value: 1280, hint: 'Lighter, loads faster' },
+  { label: 'Small', value: 800, hint: 'Lightest' },
 ];
 
 /**
@@ -33,6 +40,7 @@ export function PhotoPicker({ folder, onUploaded, onClose, title = 'Add photo' }
   const [srcUrl, setSrcUrl] = useState<string | null>(null);
   const [aspect, setAspect] = useState<number | null>(folder === 'carousel' ? 16 / 9 : folder === 'payments' ? null : 4 / 3);
   const [zoom, setZoom] = useState(1);
+  const [maxSide, setMaxSide] = useState(1920);
   const [pos, setPos] = useState({ x: 0.5, y: 0.5 }); // centre of the crop, as a fraction of the image
   const [progress, setProgress] = useState<Progress>({ percent: 0, label: '' });
   const [result, setResult] = useState<ProcessedPhoto | null>(null);
@@ -123,7 +131,7 @@ export function PhotoPicker({ folder, onUploaded, onClose, title = 'Add photo' }
     setError(null);
     setProgress({ percent: 2, label: 'Preparing…' });
     try {
-      const out = await processPhoto(image, file.size, cropRect(), setProgress);
+      const out = await processPhoto(image, file.size, cropRect(), setProgress, maxSide);
       setResult(out);
       setPreviewUrl(URL.createObjectURL(out.blob));
       setStage('ready');
@@ -227,7 +235,18 @@ export function PhotoPicker({ folder, onUploaded, onClose, title = 'Add photo' }
             <input type="range" min={1} max={4} step={0.05} value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
           </label>
-          <p className="muted small">Drag the photo to choose what is shown. Original: {image.width}×{image.height}px, {file ? fmtBytes(file.size) : ''}.</p>
+          <div className="chip-row" role="radiogroup" aria-label="Size">
+            <span className="small">Size</span>
+            {SIZES.map((z) => (
+              <button key={z.value} type="button" role="radio" aria-checked={maxSide === z.value} title={z.hint}
+                className={`chip${maxSide === z.value ? ' is-active' : ''}`} onClick={() => setMaxSide(z.value)}>{z.label}</button>
+            ))}
+          </div>
+          <p className="muted small">
+            Drag the photo to choose what is shown. Original: {image.width}×{image.height}px, {file ? fmtBytes(file.size) : ''}.
+            {' '}Saved at up to {(() => { const c = cropRect(); if (!c) return '';
+              const k = Math.min(1, maxSide / Math.max(c.sw, c.sh)); return `${Math.round(c.sw * k)}×${Math.round(c.sh * k)}px`; })()}.
+          </p>
         </div>
       )}
 

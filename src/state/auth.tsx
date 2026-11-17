@@ -11,6 +11,8 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   profileComplete: boolean;
+  /** Signed in, but the saved profile could not be loaded (network). Do not treat as incomplete. */
+  profileFailed: boolean;
   isAdmin: boolean;
   /** Starts Google sign-in; the user comes back to `returnTo` (default: the current page). */
   signIn: (returnTo?: string) => Promise<string | null>;
@@ -25,15 +27,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [profileFailed, setProfileFailed] = useState(false);
   const loadedFor = useRef<string | null>(null);
 
   const loadAccount = useCallback(async (userId: string) => {
-    const [p, a] = await Promise.all([
-      supabase.from('profiles').select('id,email,full_name,phone,avatar_url,completed_at').eq('id', userId).maybeSingle(),
-      supabase.rpc('is_admin'),
-    ]);
-    setProfile((p.data as Profile | null) ?? null);
-    setIsAdmin(a.data === true);
+    // A brief network hiccup must not look like "no profile" (that would ask for the phone number again).
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const [p, a] = await Promise.all([
+        supabase.from('profiles').select('id,email,full_name,phone,avatar_url,completed_at,member_code').eq('id', userId).maybeSingle(),
+        supabase.rpc('is_admin'),
+      ]);
+      if (!p.error) {
+        setProfile((p.data as Profile | null) ?? null);
+        setIsAdmin(a.data === true);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+    throw new Error('Could not load your profile.');
   }, []);
 
   useEffect(() => {
@@ -42,15 +53,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const apply = async (s: Session | null) => {
       if (!alive) return;
-      setSession(s);
       const id = s?.user.id ?? null;
       if (!id) {
         loadedFor.current = null;
+        setSession(null);
         setProfile(null);
         setIsAdmin(false);
       } else if (loadedFor.current !== id) {
+        // Load the saved profile BEFORE announcing the signed-in user, so the app never sees
+        // "signed in but no profile yet" and wrongly asks for the phone number again.
         loadedFor.current = id;
-        await loadAccount(id).catch(() => undefined);
+        setReady(false);
+        await loadAccount(id).catch(() => setProfileFailed(true));
+        if (!alive) return;
+        setSession(s);
+      } else {
+        setSession(s);
       }
       if (alive) setReady(true);
     };
@@ -88,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (session?.user.id) await loadAccount(session.user.id);
+    if (session?.user.id) { await loadAccount(session.user.id); setProfileFailed(false); }
   }, [session, loadAccount]);
 
   const value = useMemo<AuthState>(
@@ -98,12 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       profile,
       profileComplete: Boolean(profile?.completed_at),
+      profileFailed,
       isAdmin,
       signIn,
       signOut,
       refreshProfile,
     }),
-    [ready, session, profile, isAdmin, signIn, signOut, refreshProfile],
+    [ready, session, profile, isAdmin, signIn, signOut, refreshProfile, profileFailed],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

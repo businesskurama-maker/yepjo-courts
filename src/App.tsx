@@ -8,6 +8,10 @@ import { ProfileForm } from './components/ProfileForm';
 import Home from './pages/Home';
 import Book from './pages/Book';
 import MyBookings from './pages/MyBookings';
+import Events from './pages/Events';
+import Dance from './pages/Dance';
+import Cafe from './pages/Cafe';
+import Rewards from './pages/Rewards';
 import ChatPage from './pages/ChatPage';
 import Account from './pages/Account';
 import Privacy from './pages/Privacy';
@@ -54,10 +58,16 @@ const NAV = [
   { to: '/', label: 'Home', icon: 'home' },
   { to: '/calendar', label: 'Schedule', icon: 'grid' },
   { to: '/book', label: 'Book', icon: 'calendar' },
+  { to: '/dance', label: 'Step Up Dance', short: 'Dance', icon: 'dance' },
+  { to: '/events', label: 'Events', icon: 'trophy' },
+  { to: '/cafe', label: 'Cafe', icon: 'cup' },
+  { to: '/rewards', label: 'Rewards', icon: 'gift' },
   { to: '/bookings', label: 'Bookings', icon: 'ticket' },
   { to: '/chat', label: 'Chat', icon: 'chat' },
   { to: '/account', label: 'Account', icon: 'user' },
 ];
+/** Phone bottom bar: the rest live under More. */
+const PHONE_NAV = ['/', '/book', '/events', '/rewards'];
 
 function Shell({ children }: { children: ReactNode }) {
   const { path } = useLocation();
@@ -68,16 +78,21 @@ function Shell({ children }: { children: ReactNode }) {
   const isActive = (to: string) => (to === '/' ? path === '/' : path === to || path.startsWith(`${to}/`));
   const inAdmin = path.startsWith('/admin');
 
-  const links = (className: string) =>
-    NAV.map((n) => (
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [path]);
+  const links = (className: string, items = NAV, short = false) =>
+    items.map((n) => (
       <Link key={n.to} to={n.to} className={`${className}${isActive(n.to) ? ' is-active' : ''}`} aria-current={isActive(n.to) ? 'page' : undefined}>
         <span className="nav-icon">
           <Icon name={n.icon} />
           {n.to === '/chat' && unread > 0 && <span className="nav-badge" aria-label={`${unread} unread`}>{unread > 9 ? '9+' : unread}</span>}
         </span>
-        <span>{n.label}</span>
+        <span>{short && n.short ? n.short : n.label}</span>
       </Link>
     ));
+  const phoneMain = NAV.filter((n) => PHONE_NAV.includes(n.to));
+  const phoneMore = NAV.filter((n) => !PHONE_NAV.includes(n.to));
+  const moreActive = phoneMore.some((n) => isActive(n.to));
 
   return (
     <div className={`app${inAdmin ? ' app-admin' : ''}`}>
@@ -90,7 +105,7 @@ function Shell({ children }: { children: ReactNode }) {
             <small>Pickleball &amp; Badminton Court</small>
           </span>
         </Link>
-        <nav className="topnav" aria-label="Main">{links('topnav-link')}</nav>
+        <nav className="topnav" aria-label="Main">{links('topnav-link', NAV, true)}</nav>
         <div className="topbar-end">
           {auth.isAdmin && (
             <Link to="/admin" className={`btn btn-sm ${inAdmin ? 'btn-primary' : 'btn-outline'}`}><Icon name="shield" size={16} /> Admin</Link>
@@ -106,7 +121,7 @@ function Shell({ children }: { children: ReactNode }) {
           <Icon name="offline" size={16} /> You're offline. Availability, booking and chat need a connection.
         </div>
       )}
-      {auth.user && auth.ready && !auth.profileComplete && path !== '/welcome' && path !== '/auth/callback' && (
+      {auth.user && auth.ready && !auth.profileComplete && !auth.profileFailed && path !== '/welcome' && path !== '/auth/callback' && (
         <div className="offline-bar info-bar" role="status">
           Finish your profile to book courts and chat. <Link to="/welcome" className="link">Complete profile</Link>
         </div>
@@ -114,7 +129,25 @@ function Shell({ children }: { children: ReactNode }) {
 
       <main id="main" className="main" tabIndex={-1}>{children}</main>
 
-      {!inAdmin && <nav className="bottomnav" aria-label="Main">{links('bottomnav-link')}</nav>}
+      {!inAdmin && (
+        <nav className="bottomnav" aria-label="Main">
+          {links('bottomnav-link', phoneMain, true)}
+          <button type="button" className={`bottomnav-link${moreActive || moreOpen ? ' is-active' : ''}`} aria-expanded={moreOpen}
+            aria-controls="more-sheet" onClick={() => setMoreOpen((v) => !v)}>
+            <span className="nav-icon">
+              <Icon name="more" />
+              {unread > 0 && <span className="nav-badge" aria-label={`${unread} unread`}>{unread > 9 ? '9+' : unread}</span>}
+            </span>
+            <span>More</span>
+          </button>
+        </nav>
+      )}
+      {!inAdmin && moreOpen && (
+        <>
+          <button type="button" className="sheet-scrim" aria-label="Close menu" onClick={() => setMoreOpen(false)} />
+          <nav id="more-sheet" className="more-sheet" aria-label="More">{links('more-link', phoneMore)}</nav>
+        </>
+      )}
     </div>
   );
 }
@@ -126,15 +159,24 @@ function AuthCallback() {
   const problem = query.get('error_description') ?? hash.get('error_description');
 
   useEffect(() => {
-    if (!auth.ready || !auth.user) return;
+    if (!auth.ready || !auth.user || auth.profileFailed) return;
     if (auth.profileComplete) {
       // Returning users land on Home, except when they signed in to finish a booking or to open the admin area.
       const to = takeReturnTo();
       navigate(to.startsWith('/book') || to.startsWith('/admin') ? to : '/', { replace: true });
     }
     else navigate('/welcome', { replace: true });
-  }, [auth.ready, auth.user, auth.profileComplete]);
+  }, [auth.ready, auth.user, auth.profileComplete, auth.profileFailed]);
 
+  if (auth.ready && auth.user && auth.profileFailed) {
+    return (
+      <div className="page page-narrow">
+        <Notice kind="error">You are signed in, but your details could not be loaded. Check your connection.</Notice>
+        <button type="button" className="btn btn-primary btn-block" onClick={() => void auth.refreshProfile()}>Try again</button>
+        <Link to="/" className="btn btn-ghost btn-block">Go to Home</Link>
+      </div>
+    );
+  }
   if (problem || (auth.ready && !auth.user)) {
     return (
       <div className="page page-narrow">
@@ -206,6 +248,10 @@ export default function App() {
   else if (path === '/welcome') page = <Welcome />;
   else if (path === '/privacy') page = <Privacy />;
   else if (path === '/calendar') page = <Calendar />;
+  else if (path === '/events') page = <Events />;
+  else if (path === '/dance') page = <Dance />;
+  else if (path === '/cafe') page = <Cafe />;
+  else if (path === '/rewards') page = <Rewards />;
   else if (path === '/auth/callback') page = <AuthCallback />;
   else if (path === '/admin' || path.startsWith('/admin/')) {
     page = <Suspense fallback={<div className="page"><Spinner /></div>}><Admin /></Suspense>;

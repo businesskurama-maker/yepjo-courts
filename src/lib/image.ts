@@ -87,10 +87,11 @@ export async function processPhoto(
   originalBytes: number,
   crop: CropRect | null,
   onProgress: (p: Progress) => void = () => {},
+  maxDimension: number = START_MAX_DIMENSION,
 ): Promise<ProcessedPhoto> {
   const area = crop ?? { sx: 0, sy: 0, sw: img.width, sh: img.height };
   const longest = Math.max(area.sw, area.sh);
-  let scale = Math.min(1, START_MAX_DIMENSION / longest);
+  let scale = Math.min(1, maxDimension / longest);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new PhotoError('This browser cannot process images. Try a different browser.');

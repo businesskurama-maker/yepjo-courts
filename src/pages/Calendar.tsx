@@ -7,7 +7,7 @@ import {
   toUtcMs, todayYmd, ymdAdd, ymdAddMonth, ymdOf, type Slot,
 } from '../lib/time';
 import { CLOSURE_LABEL, SPORTS, SPORT_LABEL, type Busy, type Court, type CourtRate, type Sport } from '../lib/types';
-import { closureFor, dayTypeOf, fmtClock, rateRange, sportClosure } from '../lib/pricing';
+import { closureFor, dayTypeOf, fmtClock, hourBlocks, hourBlocksAsBusy, rateRange, sportClosure } from '../lib/pricing';
 import { useSite } from '../state/site';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -62,7 +62,7 @@ export default function Calendar() {
     for (let d = today; d <= lastDay; d = ymdAdd(d, 1)) {
       map.set(d, sportCourts.map((c) => ({
         courtId: c.id,
-        slots: closureFor(closures, c.id, d) ? [] : buildSlots(courtWindow(hours, c.id, d), slotMin, busy, c.id, now),
+        slots: closureFor(closures, c.id, d) ? [] : buildSlots(courtWindow(hours, c.id, d), slotMin, busy.concat(hourBlocksAsBusy(closures, hours, [c.id], d, 0)), c.id, now),
       })));
     }
     return map;
@@ -163,6 +163,18 @@ export default function Calendar() {
                 <span className="small">{dayClosure.note || 'Online booking is closed for this day. Message Yepjo for details.'}</span>
               </div>
             )}
+            {!dayClosure && (() => {
+              const blocks = sportCourts.flatMap((c) => hourBlocks(closures, hours, c.id, day).map((b) => ({ ...b, court: c.name })));
+              if (!blocks.length) return null;
+              const byClosure = new Map<string, { title: string; kind: string; start: number; end: number; courts: string[] }>();
+              blocks.forEach((b) => {
+                const g = byClosure.get(b.closure.id) ?? { title: b.closure.title, kind: CLOSURE_LABEL[b.closure.kind], start: b.start, end: b.end, courts: [] };
+                g.courts.push(b.court); byClosure.set(b.closure.id, g);
+              });
+              return [...byClosure.entries()].map(([id, g]) => (
+                <p key={id} className="small block-note"><strong>{g.kind}:</strong> {g.title} · {fmtTime(g.start)}–{fmtTime(g.end)} · {g.courts.length === sportCourts.length ? 'all courts' : g.courts.join(', ')}</p>
+              ));
+            })()}
             {prices.length > 0 && !dayClosure && (
               <div className="price-list" aria-label="Prices for this day">
                 {prices.map((g) => (

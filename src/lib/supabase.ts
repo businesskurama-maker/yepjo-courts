@@ -9,8 +9,29 @@ export const isConfigured = Boolean(url && key && !url.includes('YOUR-PROJECT-RE
 export const SUPABASE_URL = (url ?? 'https://not-configured.supabase.co').replace(/\/$/, '');
 export const SUPABASE_KEY = key ?? 'not-configured';
 
+// "Keep me signed in": on (default) keeps the session in localStorage so it survives closing the
+// browser; off keeps it in sessionStorage, which the browser clears when the tab or window closes.
+const KEEP_KEY = 'yepjo:keep-signed-in';
+export const getKeepSignedIn = () => {
+  try { return localStorage.getItem(KEEP_KEY) !== '0'; } catch { return true; }
+};
+export const setKeepSignedIn = (keep: boolean) => {
+  try { localStorage.setItem(KEEP_KEY, keep ? '1' : '0'); } catch { /* storage unavailable */ }
+};
+const safe = (fn: () => void) => { try { fn(); } catch { /* storage unavailable */ } };
+const authStorage = {
+  getItem: (k: string) => {
+    try { return localStorage.getItem(k) ?? sessionStorage.getItem(k); } catch { return null; }
+  },
+  setItem: (k: string, v: string) => {
+    if (getKeepSignedIn()) { safe(() => localStorage.setItem(k, v)); safe(() => sessionStorage.removeItem(k)); }
+    else { safe(() => sessionStorage.setItem(k, v)); safe(() => localStorage.removeItem(k)); }
+  },
+  removeItem: (k: string) => { safe(() => localStorage.removeItem(k)); safe(() => sessionStorage.removeItem(k)); },
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage },
 });
 
 /**

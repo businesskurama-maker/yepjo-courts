@@ -1,6 +1,6 @@
 // Mirrors public._price() on the server, which always has the final say on the amount.
-import type { Closure, Court, CourtRate, DayType } from './types';
-import { timeToMin, ymdDow } from './time';
+import type { Busy, Closure, Court, CourtHours, CourtRate, DayType } from './types';
+import { timeToMin, toUtcMs, ymdAdd, ymdDow } from './time';
 
 const MIN = 60_000;
 const HALF = 30;
@@ -56,19 +56,49 @@ export function rateRange(courtList: Court[], rates: CourtRate[], dayType?: DayT
   return vals.length ? { min: Math.min(...vals), max: Math.max(...vals) } : null;
 }
 
-/** The closure that applies to a court on a business day, if any. */
+const wholeDay = (k: Closure) => !k.start_time || !k.end_time;
+const covers = (k: Closure, courtId: number | null, ymd: string) =>
+  ymd >= k.starts_on && ymd <= k.ends_on && (k.court_ids == null || (courtId != null && k.court_ids.includes(courtId)));
+
+/** The whole-day closure that applies to a court on a business day, if any. */
 export function closureFor(closures: Closure[], courtId: number | null, ymd: string): Closure | null {
-  return (
-    closures.find(
-      (k) => ymd >= k.starts_on && ymd <= k.ends_on && (k.court_ids == null || (courtId != null && k.court_ids.includes(courtId))),
-    ) ?? null
-  );
+  return closures.find((k) => wholeDay(k) && covers(k, courtId, ymd)) ?? null;
+}
+
+/** Hour blocks (e.g. open play) on a court for a business day, as instants. Mirrors public._closure_window. */
+export function hourBlocks(closures: Closure[], hours: CourtHours[], courtId: number, ymd: string) {
+  const dow = ymdDow(ymd);
+  const opens = timeToMin(hours.find((h) => h.court_id === courtId && h.dow === dow)?.opens ?? '06:00');
+  return closures
+    .filter((k) => !wholeDay(k) && covers(k, courtId, ymd))
+    .map((k) => {
+      let s = timeToMin(k.start_time!);
+      let e = timeToMin(k.end_time!);
+      if (s < opens) s += 1440;
+      if (e <= opens) e += 1440;
+      if (e <= s) e += 1440;
+      return { closure: k, start: toUtcMs(ymd, s), end: toUtcMs(ymd, e) };
+    });
+}
+
+/** Hour blocks for the given courts and days, in the same shape as availability, so they show as blocked. */
+export function hourBlocksAsBusy(closures: Closure[], hours: CourtHours[], courtIds: number[], from: string, days: number): Busy[] {
+  const out: Busy[] = [];
+  for (let i = -1; i <= days; i++) {
+    const d = ymdAdd(from, i);
+    for (const id of courtIds) {
+      for (const b of hourBlocks(closures, hours, id, d)) {
+        out.push({ court_id: id, starts_at: new Date(b.start).toISOString(), ends_at: new Date(b.end).toISOString(), state: 'blocked' });
+      }
+    }
+  }
+  return out;
 }
 
 /** Closure covering every court of a sport on a day (the whole sport is closed). */
 export function sportClosure(closures: Closure[], courts: Court[], ymd: string): Closure | null {
   if (!courts.length) return null;
-  const all = closures.find((k) => ymd >= k.starts_on && ymd <= k.ends_on && k.court_ids == null);
+  const all = closures.find((k) => wholeDay(k) && ymd >= k.starts_on && ymd <= k.ends_on && k.court_ids == null);
   if (all) return all;
   const each = courts.map((c) => closureFor(closures, c.id, ymd));
   return each.every(Boolean) ? each[0] : null;

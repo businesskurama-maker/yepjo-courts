@@ -13,13 +13,23 @@ import Inbox from './Inbox';
 import Payments from './Payments';
 import Reports from './Reports';
 import SettingsPage from './SettingsPage';
+import EventsAdmin from './EventsAdmin';
+import DanceAdmin from './DanceAdmin';
+import CafeAdmin from './CafeAdmin';
+import RewardsAdmin from './RewardsAdmin';
+import Scan from './Scan';
 
 const TABS = [
   { to: '/admin', label: 'Dashboard', icon: 'grid' },
   { to: '/admin/bookings', label: 'Bookings', icon: 'ticket' },
   { to: '/admin/payments', label: 'Payments', icon: 'qr' },
   { to: '/admin/reports', label: 'Sales report', icon: 'chart' },
+  { to: '/admin/scan', label: 'Scan QR', icon: 'scan' },
   { to: '/admin/courts', label: 'Courts', icon: 'court' },
+  { to: '/admin/events', label: 'Events', icon: 'trophy' },
+  { to: '/admin/dance', label: 'Step Up Dance', icon: 'dance' },
+  { to: '/admin/cafe', label: 'Cafe menu', icon: 'cup' },
+  { to: '/admin/rewards', label: 'Rewards', icon: 'gift' },
   { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
   { to: '/admin/photos', label: 'Photos', icon: 'image' },
   { to: '/admin/inbox', label: 'Inbox', icon: 'chat' },
@@ -101,6 +111,11 @@ function AdminArea({ path }: { path: string }) {
   else if (path.startsWith('/admin/bookings')) page = <Bookings />;
   else if (path.startsWith('/admin/reports')) page = <Reports />;
   else if (path.startsWith('/admin/courts')) page = <Courts />;
+  else if (path.startsWith('/admin/scan')) page = <Scan />;
+  else if (path.startsWith('/admin/events')) page = <EventsAdmin />;
+  else if (path.startsWith('/admin/dance')) page = <DanceAdmin />;
+  else if (path.startsWith('/admin/cafe')) page = <CafeAdmin />;
+  else if (path.startsWith('/admin/rewards')) page = <RewardsAdmin />;
   else if (path.startsWith('/admin/announcements')) page = <Announcements />;
   else if (path.startsWith('/admin/photos')) page = <Photos />;
   else if (path.startsWith('/admin/inbox')) page = <Inbox />;

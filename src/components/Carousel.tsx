@@ -3,14 +3,15 @@ import { photoUrl } from '../lib/supabase';
 import type { CarouselPhoto } from '../lib/types';
 import { Icon } from './ui';
 
-const INTERVAL_MS = 5000;
 const RESUME_AFTER_MS = 8000;
 
 /** Featured photos: advances automatically, pauses on hover, focus, touch or manual control. */
-export function Carousel({ photos }: { photos: CarouselPhoto[] }) {
+export function Carousel({ photos, seconds = 6 }: { photos: CarouselPhoto[]; seconds?: number }) {
+  const INTERVAL_MS = Math.min(60, Math.max(2, seconds)) * 1000;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [userPaused, setUserPaused] = useState(false);
+  const [portrait, setPortrait] = useState<Record<string, boolean>>({});
   const resumeTimer = useRef<number | undefined>(undefined);
   const swipeStart = useRef<number | null>(null);
   const count = photos.length;
@@ -26,7 +27,7 @@ export function Carousel({ photos }: { photos: CarouselPhoto[] }) {
       if (document.visibilityState === 'visible') setIndex((i) => (i + 1) % count);
     }, INTERVAL_MS);
     return () => window.clearInterval(t);
-  }, [count, paused, userPaused, reduceMotion]);
+  }, [count, paused, userPaused, reduceMotion, INTERVAL_MS]);
 
   useEffect(() => () => window.clearTimeout(resumeTimer.current), []);
 
@@ -83,9 +84,15 @@ export function Carousel({ photos }: { photos: CarouselPhoto[] }) {
     >
       <div className="carousel-track">
         {photos.map((p, i) => (
-          <figure key={p.id} className={`carousel-slide${i === index ? ' is-active' : ''}`} aria-hidden={i !== index}
+          <figure key={p.id} className={`carousel-slide${i === index ? ' is-active' : ''}${portrait[p.id] ? ' is-portrait' : ''}`} aria-hidden={i !== index}
             role="group" aria-roledescription="slide" aria-label={`${i + 1} of ${count}`}>
+            {portrait[p.id] && <img className="slide-backdrop" src={photoUrl(p.image_path)} alt="" aria-hidden="true" draggable={false} />}
             <img
+              onLoad={(e) => {
+                const im = e.currentTarget;
+                const tall = im.naturalHeight > im.naturalWidth * 1.05;
+                if (tall !== !!portrait[p.id]) setPortrait((m) => ({ ...m, [p.id]: tall }));
+              }}
               src={photoUrl(p.image_path)}
               alt={p.alt_text || p.caption || 'Yepjo court photo'}
               loading={i === 0 ? 'eager' : 'lazy'}

@@ -27,6 +27,14 @@ export interface Settings {
   payment_qr_path: string | null;
   payment_instructions: string;
   payment_hold_minutes: number;
+  carousel_seconds?: number;
+  rewards_enabled?: boolean;
+  /** Hours of court rental per 1 loyalty point (0 = off). */
+  points_court_hours?: number;
+  /** Pesos spent per 1 loyalty point (0 = off). */
+  points_purchase_amount?: number;
+  points_dance_booking?: number;
+  points_event?: number;
 }
 
 export interface Court {
@@ -48,7 +56,7 @@ export interface CourtRate {
   rate: number;
 }
 
-export type ClosureKind = 'closed' | 'holiday' | 'event';
+export type ClosureKind = 'closed' | 'holiday' | 'event' | 'open_play';
 export interface Closure {
   id: string;
   starts_on: string; // YYYY-MM-DD (business day)
@@ -57,8 +65,11 @@ export interface Closure {
   kind: ClosureKind;
   title: string;
   note: string | null;
+  /** Set both to block only these hours (e.g. open play); null = the whole day. */
+  start_time?: string | null;
+  end_time?: string | null;
 }
-export const CLOSURE_LABEL: Record<ClosureKind, string> = { closed: 'Closed', holiday: 'Holiday', event: 'Special event' };
+export const CLOSURE_LABEL: Record<ClosureKind, string> = { closed: 'Closed', holiday: 'Holiday', event: 'Special event', open_play: 'Open play' };
 
 export interface CourtHours {
   court_id: number;
@@ -117,6 +128,8 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   completed_at: string | null;
+  /** Personal loyalty code shown as a QR on the Rewards page. */
+  member_code?: string | null;
 }
 
 export interface Announcement {
@@ -165,5 +178,89 @@ export interface ActivityLog {
   entity: string;
   entity_id: string | null;
   details: { label?: string | null; changed?: string[]; [k: string]: unknown };
+  created_at: string;
+}
+
+// ---------------------------------------------------------------- portals
+export interface CafeItem {
+  id: string;
+  category: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  image_path: string | null;
+  is_available: boolean;
+  sort_order: number;
+}
+
+export type EventKind = 'open_play' | 'training' | 'tournament' | 'other';
+export const EVENT_KIND_LABEL: Record<EventKind, string> = { open_play: 'Open play', training: 'Training', tournament: 'Tournament', other: 'Event' };
+export interface YepjoEvent {
+  id: string;
+  kind: EventKind;
+  sport: Sport | 'dance' | null;
+  title: string;
+  description: string | null;
+  image_path: string | null;
+  starts_on: string;
+  ends_on: string;
+  start_time: string;
+  end_time: string;
+  price: number;
+  capacity: number | null;
+  is_published: boolean;
+  registration_open: boolean;
+}
+
+export interface DanceSession {
+  id: string;
+  dance_type: string;
+  instructor: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  price: number;
+  step_board: boolean;
+  note: string | null;
+  is_published: boolean;
+}
+
+export interface Registration {
+  id: string;
+  reference: string;
+  kind: 'event' | 'dance';
+  event_id: string | null;
+  dance_session_id: string | null;
+  user_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+  amount: number;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  payment_method: 'free' | 'online' | 'venue';
+  payment_status: PaymentStatus;
+  payment_ref: string | null;
+  payment_note: string | null;
+  hold_expires_at: string | null;
+  created_at: string;
+  cancelled_at: string | null;
+  event?: Pick<YepjoEvent, 'id' | 'title' | 'kind' | 'starts_on' | 'ends_on' | 'start_time' | 'end_time'> | null;
+  dance?: Pick<DanceSession, 'id' | 'dance_type' | 'instructor' | 'starts_at' | 'ends_at'> | null;
+}
+
+export interface Reward {
+  id: string;
+  title: string;
+  description: string | null;
+  points_cost: number;
+  image_path: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface PointsEntry {
+  points: number;
+  source: 'court' | 'dance' | 'event' | 'purchase' | 'manual' | 'redeem' | 'reversal';
+  note: string | null;
   created_at: string;
 }

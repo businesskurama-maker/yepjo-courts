@@ -47,7 +47,7 @@ export default function Home() {
         </h1>
         <p className="hero-tagline">{settings.tagline}</p>
         <Link to="/book" className="btn btn-primary btn-xl"><Icon name="calendar" /> Book a Court</Link>
-        <p className="section-label">Choose your sport</p>
+        <p className="section-label">Choose your game</p>
         <div className="sport-row" role="group" aria-label="Choose a sport to book">
           {SPORTS.map((s) => {
             const n = courts.filter((c) => c.sport === s && c.is_active).length;
@@ -59,11 +59,16 @@ export default function Home() {
               </Link>
             );
           })}
+          <Link to="/dance" className="sport-card sport-dance">
+            <span className="sport-icon"><Icon name="dance" size={30} /></span>
+            <span className="sport-name">Step Up Dance</span>
+            <span className="sport-meta">Classes <Icon name="right" size={14} /></span>
+          </Link>
         </div>
       </section>
 
       <div className="home-media">
-        <Carousel photos={photos} />
+        <Carousel photos={photos} seconds={settings.carousel_seconds ?? 6} />
       </div>
 
       <div className="home-info">

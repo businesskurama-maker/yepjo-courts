@@ -349,6 +349,7 @@ const KINDS: { key: ClosureKind; hint: string; title: string }[] = [
   { key: 'closed', hint: 'Courts closed (maintenance, weather…)', title: 'Closed' },
   { key: 'holiday', hint: 'Public or local holiday', title: 'Holiday' },
   { key: 'event', hint: 'Tournament, private or special event', title: '' },
+  { key: 'open_play', hint: 'Courts kept for open play during set hours', title: 'Open play' },
 ];
 
 const dayLabel = (ymd: string) => fmtDateLong(toUtcMs(ymd, 720));
@@ -382,16 +383,16 @@ function Closures() {
   return (
     <section className="card" aria-labelledby="c-closures">
       <div className="card-head">
-        <h2 id="c-closures">Closed dates &amp; events</h2>
+        <h2 id="c-closures">Closed dates, open play &amp; events</h2>
         <button type="button" className="btn btn-sm btn-outline" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> Add date</button>
       </div>
-      <p className="muted small">Customers cannot book online on these days; the Schedule and booking pages show the reason. For a few hours only, use Bookings → Block time.</p>
+      <p className="muted small">Block whole days (closed, holiday, special event) or only some hours on chosen courts (e.g. open play). Customers cannot book those times online; the Schedule and booking pages show why.</p>
       <ul className="rows">
         {upcoming.map((k) => (
           <li key={k.id} className="row">
             <span className="row-main">
               <strong><span className={`badge closure-badge kind-${k.kind}`}>{CLOSURE_LABEL[k.kind]}</span> {k.title}</strong>
-              <span className="small muted">{rangeLabel(k.starts_on, k.ends_on)} · {courtNames(k.court_ids)}{k.note ? ` · ${k.note}` : ''}</span>
+              <span className="small muted">{rangeLabel(k.starts_on, k.ends_on)}{k.start_time && k.end_time ? ` · ${fmtClock(k.start_time)}–${fmtClock(k.end_time)}` : ' · all day'} · {courtNames(k.court_ids)}{k.note ? ` · ${k.note}` : ''}</span>
             </span>
             <span className="row-actions">
               <button type="button" className="btn btn-sm" onClick={() => setEditing(k)}><Icon name="edit" size={16} /> Edit</button>
@@ -424,6 +425,9 @@ function ClosureDialog({ closure, onClose }: { closure: Closure | null; onClose:
   const [allCourts, setAllCourts] = useState(closure ? closure.court_ids == null : true);
   const [picked, setPicked] = useState<number[]>(closure?.court_ids ?? []);
   const [note, setNote] = useState(closure?.note ?? '');
+  const [someHours, setSomeHours] = useState(Boolean(closure?.start_time));
+  const [fromTime, setFromTime] = useState(closure?.start_time ? hhmm(closure.start_time) : '18:00');
+  const [toTime, setToTime] = useState(closure?.end_time ? hhmm(closure.end_time) : '21:00');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [affected, setAffected] = useState<ClosureBooking[] | null>(null);
@@ -432,6 +436,7 @@ function ClosureDialog({ closure, onClose }: { closure: Closure | null; onClose:
   const pickKind = (k: ClosureKind) => {
     setKind(k);
     if (!titleTouched.current) setTitle(KINDS.find((x) => x.key === k)!.title);
+    if (k === 'open_play') setSomeHours(true);
   };
 
   // Bookings already made on those days, so the admin can contact the customers.
@@ -453,8 +458,12 @@ function ClosureDialog({ closure, onClose }: { closure: Closure | null; onClose:
     if (!from || !to) return setError('Choose the dates.');
     if (to < from) return setError('The last day must be on or after the first day.');
     if (!allCourts && picked.length === 0) return setError('Choose at least one court, or tick All courts.');
+    if (someHours && (!fromTime || !toTime || fromTime === toTime)) return setError('Choose a start and a different end time.');
     setBusy(true);
-    const payload = { kind, title: title.trim(), starts_on: from, ends_on: to, court_ids: allCourts ? null : picked, note: note.trim() || null };
+    const payload = {
+      kind, title: title.trim(), starts_on: from, ends_on: to, court_ids: allCourts ? null : picked, note: note.trim() || null,
+      start_time: someHours ? fromTime : null, end_time: someHours ? toTime : null,
+    };
     const { error: err } = closure
       ? await supabase.from('closures').update(payload).eq('id', closure.id)
       : await supabase.from('closures').insert(payload);
@@ -487,6 +496,20 @@ function ClosureDialog({ closure, onClose }: { closure: Closure | null; onClose:
           <Field label="To (same day for one day)"><input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} required /></Field>
         </div>
         <fieldset className="fieldset">
+          <legend className="field-label">Hours</legend>
+          <div className="chip-row" role="radiogroup" aria-label="Hours">
+            <button type="button" role="radio" aria-checked={!someHours} className={`chip${!someHours ? ' is-active' : ''}`} onClick={() => setSomeHours(false)}>Whole day</button>
+            <button type="button" role="radio" aria-checked={someHours} className={`chip${someHours ? ' is-active' : ''}`} onClick={() => setSomeHours(true)}>Only these hours</button>
+          </div>
+          {someHours && (
+            <div className="form-2">
+              <Field label="From"><input type="time" step={1800} value={fromTime} onChange={(e) => setFromTime(e.target.value)} /></Field>
+              <Field label="To" hint={toTime && fromTime && toTime <= fromTime ? 'Ends after midnight' : undefined}><input type="time" step={1800} value={toTime} onChange={(e) => setToTime(e.target.value)} /></Field>
+            </div>
+          )}
+          <p className="tiny muted">{someHours ? 'Only these hours are blocked on the chosen courts; the rest of the day stays bookable.' : 'Online booking is closed all day.'}</p>
+        </fieldset>
+        <fieldset className="fieldset">
           <legend className="field-label">Courts</legend>
           <Toggle checked={allCourts} onChange={setAllCourts} label="All courts" />
           {!allCourts && (
@@ -504,7 +527,7 @@ function ClosureDialog({ closure, onClose }: { closure: Closure | null; onClose:
         <Field label="Note for customers (optional)" hint="e.g. Open again Dec 26 at 7 AM.">
           <input type="text" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
         </Field>
-        {affected && affected.length > 0 && (
+        {affected && affected.length > 0 && !someHours && (
           <Notice kind="warn">
             <strong>{affected.length} booking{affected.length === 1 ? ' is' : 's are'} already on {from === to ? 'this day' : 'these days'}.</strong>{' '}
             They are not cancelled automatically. Contact the customer{affected.length === 1 ? '' : 's'} and cancel or move them in Bookings.
