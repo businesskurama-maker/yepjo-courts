@@ -145,7 +145,7 @@ export function CafeSettingsCard({ unpriced }: { unpriced: number }) {
         <strong>Online ordering {ready ? <span className="badge badge-ok">On</span> : <span className="badge badge-off">Off</span>}</strong>
         <p className="small muted">Hours {clockLabel(opens)} – {clockLabel(closes)} · ready in about {settings.cafe_prep_minutes ?? 15} min · customers pay by QR first.</p>
         {on && !ready && <p className="small warn-text">Turn on online payment and upload the payment QR in Settings to accept orders.</p>}
-        {unpriced > 0 && <p className="small warn-text">{unpriced} item{unpriced === 1 ? ' has' : 's have'} no price yet and can't be ordered online. Edit them below to add a price.</p>}
+        {unpriced > 0 && <p className="small warn-text">{unpriced} item{unpriced === 1 ? ' has' : 's have'} no price yet and can't be ordered online yet. Add prices in the Menu tab.</p>}
       </div>
       <button type="button" className="btn btn-sm btn-outline" onClick={() => { setF({ opens, closes, on, prep: settings.cafe_prep_minutes ?? 15 }); setOpen(true); }}>
         <Icon name="settings" size={16} /> Hours &amp; ordering
