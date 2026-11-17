@@ -28,7 +28,7 @@ const TABS = [
   { to: '/admin/courts', label: 'Courts', icon: 'court' },
   { to: '/admin/events', label: 'Events', icon: 'trophy' },
   { to: '/admin/dance', label: 'Step Up Dance', icon: 'dance' },
-  { to: '/admin/cafe', label: 'Cafe menu', icon: 'cup' },
+  { to: '/admin/cafe', label: 'Cafe', icon: 'cup' },
   { to: '/admin/rewards', label: 'Rewards', icon: 'gift' },
   { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
   { to: '/admin/photos', label: 'Photos', icon: 'image' },
@@ -71,6 +71,21 @@ function usePaymentsToCheck(): number {
   return count;
 }
 
+/** Cafe orders that need the kitchen's attention (payment to check, or paid and not yet ready). */
+function useCafeToDo(): number {
+  const { pulse } = useSite();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      supabase.from('cafe_orders').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('payment_status', 'submitted'),
+      supabase.from('cafe_orders').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
+    ]).then(([a, b]) => alive && setCount((a.count ?? 0) + (b.count ?? 0)));
+    return () => { alive = false; };
+  }, [pulse]);
+  return count;
+}
+
 export default function Admin() {
   const auth = useAuth();
   const { path } = useLocation();
@@ -103,6 +118,7 @@ export default function Admin() {
 function AdminArea({ path }: { path: string }) {
   const unread = useUnreadInquiries();
   const toCheck = usePaymentsToCheck();
+  const cafeToDo = useCafeToDo();
   const active = (to: string) => (to === '/admin' ? path === '/admin' : path.startsWith(to));
 
   let page;
@@ -131,6 +147,7 @@ function AdminArea({ path }: { path: string }) {
             <Icon name={t.icon} size={18} />
             <span>{t.label}</span>
             {t.to === '/admin/inbox' && unread > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${unread} unread`}>{unread}</span>}
+            {t.to === '/admin/cafe' && cafeToDo > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${cafeToDo} new cafe orders`}>{cafeToDo}</span>}
             {t.to === '/admin/payments' && toCheck > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${toCheck} to check`}>{toCheck}</span>}
           </Link>
         ))}

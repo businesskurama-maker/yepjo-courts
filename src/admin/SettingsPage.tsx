@@ -172,6 +172,11 @@ export default function SettingsPage() {
               <input type="number" min={0} max={720} value={form.cancel_cutoff_hours} disabled={!form.allow_cancellation}
                 onChange={(e) => set('cancel_cutoff_hours', num(e.target.value, 0, 720))} />
             </Field>
+            <Field label="Cancellation fee kept (% of what was paid online)">
+              <input type="number" min={0} max={100} value={form.cancel_fee_percent ?? 50}
+                onChange={(e) => set('cancel_fee_percent', num(e.target.value, 0, 100))} />
+            </Field>
+            <p className="muted small">When a paid booking or sign-up is cancelled, this part is kept as a fee. The rest is not refunded online: the customer collects it in person at the venue. Payments → Refunds to hand over lists who is waiting. Pay-at-venue bookings have no fee.</p>
             <Field label="Policy note shown to customers (optional)">
               <textarea rows={2} value={form.cancellation_note} onChange={(e) => set('cancellation_note', e.target.value)} maxLength={300} />
             </Field>

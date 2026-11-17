@@ -344,12 +344,17 @@ export default function Book() {
   const slotButton = (s: Slot) => {
     const i = slots.indexOf(s);
     const selected = startIndex >= 0 && i >= startIndex && i < startIndex + count;
+    const first = selected && i === startIndex;
+    const last = selected && i === startIndex + count - 1;
     const label = `${fmtTime(s.start)} to ${fmtTime(s.end)}, ${selected ? 'selected' : s.state === 'past' ? 'no longer available' : s.state}`;
+    // Each box is a block that starts at the time shown; the last selected box also shows when the booking ends.
+    const note = !selected ? null : count === 1 ? `until ${fmtTime(s.end)}` : first ? 'Start' : last ? `until ${fmtTime(s.end)}` : '✓';
     return (
-      <button key={s.start} type="button" className={`slot slot-${s.state}${selected ? ' is-selected' : ''}`}
+      <button key={s.start} type="button"
+        className={`slot slot-${s.state}${selected ? ' is-selected' : ''}${first ? ' is-first' : ''}${last ? ' is-last' : ''}`}
         disabled={s.state !== 'available'} aria-pressed={selected} aria-label={label} onClick={() => pickSlot(i)}>
         <span>{fmtTime(s.start)}</span>
-        <small>{selected ? 'Selected' : s.state === 'available' ? slotPrice(s.start) : s.state === 'past' ? 'Past' : s.state === 'booked' ? 'Booked' : 'Blocked'}</small>
+        <small>{selected ? note : s.state === 'available' ? slotPrice(s.start) : s.state === 'past' ? 'Past' : s.state === 'booked' ? 'Booked' : 'Blocked'}</small>
       </button>
     );
   };
@@ -476,7 +481,7 @@ export default function Book() {
                 <li><i className="sw sw-booked" /> Booked</li>
                 <li><i className="sw sw-blocked" /> Blocked</li>
               </ul>
-              <p className="tiny muted">Prices shown are per hour.</p>
+              <p className="tiny muted">Each box is one hour, starting at the time shown. Prices are per hour.</p>
               {court && date && hourBlocks(closures, hours, court.id, date).map((b) => (
                 <p key={b.closure.id} className="tiny block-note">
                   <strong>{CLOSURE_LABEL[b.closure.kind]}:</strong> {b.closure.title} · {fmtTime(b.start)}–{fmtTime(b.end)} (not bookable)
@@ -502,6 +507,16 @@ export default function Book() {
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+              {selectionOk && start !== null && end !== null && (
+                <div className="time-summary" aria-live="polite">
+                  <div className="time-summary-range">
+                    <span><small>Start</small><strong>{fmtTime(start)}</strong></span>
+                    <Icon name="right" size={20} />
+                    <span><small>End{endsNextDay ? ` · ${fmtDateShort(end)}` : ''}</small><strong>{fmtTime(end)}</strong></span>
+                  </div>
+                  <span className="time-summary-meta">{fmtDuration(minutes)}{amount != null ? ` · ${fmtMoney(amount, settings.currency)}` : ''}</span>
                 </div>
               )}
             </>
@@ -549,9 +564,8 @@ export default function Book() {
           )}
           <p className="muted small policy">
             {settings.allow_cancellation
-              ? `You can cancel in My Bookings up to ${settings.cancel_cutoff_hours} hour${settings.cancel_cutoff_hours === 1 ? '' : 's'} before the start time.`
+              ? `You can cancel in My Bookings up to ${settings.cancel_cutoff_hours} hour${settings.cancel_cutoff_hours === 1 ? '' : 's'} before the start time. If you paid online, ${settings.cancel_fee_percent ?? 50}% is kept as a cancellation fee and the rest is refunded in person at Yepjo.`
               : 'Online cancellation is not available. Message Yepjo if your plans change.'}
-            {settings.cancellation_note ? ` ${settings.cancellation_note}` : ''}
           </p>
 
           {!auth.ready ? <Spinner label="Checking your account…" />

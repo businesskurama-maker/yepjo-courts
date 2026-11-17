@@ -6,6 +6,7 @@ import { supabase, toAppError } from '../lib/supabase';
 import { fmtDateLong, fmtDateTime, fmtMoney, fmtRange } from '../lib/time';
 import { SPORT_LABEL, type Reservation } from '../lib/types';
 import { useSite } from '../state/site';
+import { RefundsPanel } from './Refunds';
 
 type Tab = 'check' | 'waiting' | 'verified';
 const PAGE_SIZE = 10;
@@ -65,6 +66,7 @@ export default function Payments() {
   return (
     <div className="stack">
       <h1 className="page-title">Payments</h1>
+      <RefundsPanel />
       {!settings.online_payment_enabled && (
         <Notice kind="warn">Online payment is off. Upload your QR code and turn it on in <Link className="link" to="/admin/settings">Settings → Payments</Link>.</Notice>
       )}

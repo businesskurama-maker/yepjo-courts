@@ -113,9 +113,10 @@ begin
   perform t.run(b, format('select submit_registration_payment(%L, %L)', rv, '654321'));
   perform t.run(b, format('select admin_review_registration(%L, true)', rv), 'FORBIDDEN');
   perform t.eq(t.run(adm, format('select (admin_review_registration(%L, true)).status', rv)), 'confirmed', 'admin approves the payment');
-  perform t.run(b, format('select cancel_registration(%L)', rv), 'CANCEL_NOT_ALLOWED');
+  perform t.eq(t.run(b, format($q$select cancel_fee || '/' || refund_amount || '/' || refund_status from cancel_registration(%L)$q$, rv)),
+               '250.00/250.00/to_claim', 'paid sign-up cancelled: 50%% fee kept, 50%% to claim at the venue');
   perform t.eq(t.run(a, 'select count(*) from registrations'), '1', 'members see only their own sign-ups');
-  perform t.eq(t.run(null, format($q$select taken from signup_counts() where target = %L$q$, ev_paid)), '1', 'public place count, no names');
+  perform t.eq(t.run(null, format($q$select taken from signup_counts() where target = %L$q$, ev_paid)), '0', 'public place count, no names (cancelled frees the place)');
 
   raise notice '--- step up dance';
   dc := t.run(adm, format($q$insert into dance_sessions (dance_type, instructor, starts_at, ends_at, capacity, price)

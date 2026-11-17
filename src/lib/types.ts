@@ -35,6 +35,11 @@ export interface Settings {
   points_purchase_amount?: number;
   points_dance_booking?: number;
   points_event?: number;
+  cancel_fee_percent?: number;
+  cafe_opens?: string;
+  cafe_closes?: string;
+  cafe_ordering_enabled?: boolean;
+  cafe_prep_minutes?: number;
 }
 
 export interface Court {
@@ -118,6 +123,9 @@ export interface Reservation {
   payment_verified_at?: string | null;
   payment_note?: string | null;
   hold_expires_at?: string | null;
+  cancel_fee?: number | null;
+  refund_amount?: number | null;
+  refund_status?: 'none' | 'to_claim' | 'claimed';
   court?: Pick<Court, 'id' | 'name' | 'sport'> | null;
 }
 
@@ -244,6 +252,9 @@ export interface Registration {
   hold_expires_at: string | null;
   created_at: string;
   cancelled_at: string | null;
+  cancel_fee?: number | null;
+  refund_amount?: number | null;
+  refund_status?: 'none' | 'to_claim' | 'claimed';
   event?: Pick<YepjoEvent, 'id' | 'title' | 'kind' | 'starts_on' | 'ends_on' | 'start_time' | 'end_time'> | null;
   dance?: Pick<DanceSession, 'id' | 'dance_type' | 'instructor' | 'starts_at' | 'ends_at'> | null;
 }
@@ -260,7 +271,31 @@ export interface Reward {
 
 export interface PointsEntry {
   points: number;
-  source: 'court' | 'dance' | 'event' | 'purchase' | 'manual' | 'redeem' | 'reversal';
+  source: 'court' | 'dance' | 'event' | 'purchase' | 'cafe' | 'manual' | 'redeem' | 'reversal';
   note: string | null;
   created_at: string;
+}
+
+export interface CafeOrderLine { id: string; name: string; price: number; qty: number }
+export type CafeOrderStatus = 'pending' | 'paid' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+export interface CafeOrder {
+  id: string;
+  reference: string;
+  user_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  items: CafeOrderLine[];
+  total: number;
+  amount: number | null;
+  pickup_at: string | null;
+  note: string | null;
+  status: CafeOrderStatus;
+  payment_status: PaymentStatus;
+  payment_ref: string | null;
+  payment_note: string | null;
+  hold_expires_at: string | null;
+  refund_amount: number | null;
+  refund_status: 'none' | 'to_claim' | 'claimed';
+  created_at: string;
+  cancel_reason: string | null;
 }

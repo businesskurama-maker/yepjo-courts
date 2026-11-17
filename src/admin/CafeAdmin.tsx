@@ -5,6 +5,7 @@ import { photoUrl, supabase, toAppError } from '../lib/supabase';
 import { fmtMoney } from '../lib/time';
 import type { CafeItem } from '../lib/types';
 import { useSite } from '../state/site';
+import { CafeOrdersAdmin, CafeSettingsCard } from './CafeOrders';
 
 /** Admin: Yepjo Cafe menu (categories, items, prices, photos, availability). */
 export default function CafeAdmin() {
@@ -15,6 +16,7 @@ export default function CafeAdmin() {
   const [editing, setEditing] = useState<CafeItem | 'new' | null>(null);
   const [removing, setRemoving] = useState<CafeItem | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<'orders' | 'menu'>('orders');
 
   const load = useCallback(async () => {
     const { data, error: err } = await supabase.from('cafe_items').select('*').order('category').order('sort_order').order('name');
@@ -42,11 +44,17 @@ export default function CafeAdmin() {
 
   return (
     <div className="stack">
+      <h1 className="page-title">Yepjo Cafe</h1>
+      <CafeSettingsCard unpriced={(rows ?? []).filter((r) => r.price == null).length} />
+      <div className="tabs" role="tablist" aria-label="Cafe">
+        <button type="button" role="tab" aria-selected={tab === 'orders'} className={`tab${tab === 'orders' ? ' is-active' : ''}`} onClick={() => setTab('orders')}>Orders</button>
+        <button type="button" role="tab" aria-selected={tab === 'menu'} className={`tab${tab === 'menu' ? ' is-active' : ''}`} onClick={() => setTab('menu')}>Menu</button>
+      </div>
+      {tab === 'orders' ? <CafeOrdersAdmin /> : (<>
       <div className="title-row">
-        <h1 className="page-title">Cafe menu</h1>
+        <p className="muted small">Shown on the Cafe page. Turn an item off when it runs out today. Items need a price to be ordered online.</p>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setEditing('new')}><Icon name="plus" size={16} /> Add item</button>
       </div>
-      <p className="muted small">Shown on the Cafe page. Turn an item off when it runs out today. Purchases earn points when you scan the customer's Rewards QR (Scan QR).</p>
       {error && <Notice kind="error">{error}</Notice>}
       {rows === null && !error && <Spinner />}
       {rows !== null && rows.length === 0 && <Empty icon="cup" title="No menu items yet">Add food and drinks with Add item.</Empty>}
@@ -58,7 +66,7 @@ export default function CafeAdmin() {
               <li key={i.id} className="row row-photo">
                 {i.image_path ? <img className="thumb" src={photoUrl(i.image_path)} alt="" /> : <span className="thumb portal-img-art"><Icon name="cup" size={18} /></span>}
                 <span className="row-main">
-                  <strong>{i.name}{i.price != null && <span className="ok-text"> · {fmtMoney(Number(i.price), settings.currency)}</span>}</strong>
+                  <strong>{i.name}{i.price != null ? <span className="ok-text"> · {fmtMoney(Number(i.price), settings.currency)}</span> : <span className="badge badge-warn">No price</span>}</strong>
                   {i.description && <span className="small muted clamp-1">{i.description}</span>}
                   <Toggle checked={i.is_available} onChange={(v) => void available(i, v)} label={i.is_available ? 'Available' : 'Not available today'} />
                 </span>
@@ -71,6 +79,7 @@ export default function CafeAdmin() {
           </ul>
         </section>
       ))}
+      </>)}
       {editing && <ItemDialog item={editing === 'new' ? null : editing} categories={cats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
       {removing && (
         <Confirm title={`Remove ${removing.name}?`} confirmLabel="Remove" danger busy={busy} onConfirm={() => void remove()} onClose={() => setRemoving(null)}>
@@ -122,7 +131,7 @@ function ItemDialog({ item, categories, onClose, onSaved }: { item: CafeItem | n
         <Field label="Name"><input type="text" value={f.name} maxLength={80} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Tapsilog" required /></Field>
         <Field label="Description (optional)"><input type="text" value={f.description} maxLength={300} onChange={(e) => set('description', e.target.value)} /></Field>
         <div className="form-2">
-          <Field label="Price (₱)" hint="Leave empty to hide the price"><input type="number" min={0} step="1" value={f.price} onChange={(e) => set('price', e.target.value)} /></Field>
+          <Field label="Price (₱)" hint="Needed for online orders"><input type="number" min={0} step="1" value={f.price} onChange={(e) => set('price', e.target.value)} /></Field>
           <Field label="Order in its category" hint="Lower comes first"><input type="number" value={f.sort_order} onChange={(e) => set('sort_order', e.target.value)} /></Field>
         </div>
         <div className="photo-field">

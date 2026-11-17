@@ -29,6 +29,7 @@ export default function Bookings() {
   const [detail, setDetail] = useState<Reservation | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
   const [reason, setReason] = useState('');
+  const [fullRefund, setFullRefund] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<'walk_in' | 'block' | null>(null);
 
@@ -69,7 +70,7 @@ export default function Bookings() {
   const cancel = async () => {
     if (!cancelling) return;
     setBusy(true);
-    const { error: err } = await supabase.rpc('cancel_reservation', { p_id: cancelling.id, p_reason: reason });
+    const { error: err } = await supabase.rpc('cancel_reservation', { p_id: cancelling.id, p_reason: reason, p_full_refund: fullRefund });
     setBusy(false);
     if (err) toast(toAppError(err).message, 'error');
     else {
@@ -179,6 +180,19 @@ export default function Bookings() {
         <Confirm title={cancelling.kind === 'block' ? 'Remove this block?' : 'Cancel this reservation?'} danger busy={busy}
           confirmLabel={cancelling.kind === 'block' ? 'Remove block' : 'Cancel reservation'} onConfirm={() => void cancel()} onClose={() => setCancelling(null)}>
           <p>{courtName(cancelling.court_id)}<br />{fmtDateLong(cancelling.starts_at)} · {fmtRange(cancelling.starts_at, cancelling.ends_at)}</p>
+          {cancelling.payment_status === 'verified' && Number(cancelling.amount ?? 0) > 0 && (
+            <fieldset className="pay-choice">
+              <legend className="field-label">Paid online: {fmtMoney(Number(cancelling.amount), settings.currency)}</legend>
+              <label className={`pay-option${!fullRefund ? ' is-active' : ''}`}>
+                <input type="radio" name="refund" checked={!fullRefund} onChange={() => setFullRefund(false)} />
+                <span><strong>Customer cancelled: keep {settings.cancel_fee_percent ?? 50}% fee</strong><small>Refund {fmtMoney(Number(cancelling.amount) * (100 - (settings.cancel_fee_percent ?? 50)) / 100, settings.currency)} at the counter.</small></span>
+              </label>
+              <label className={`pay-option${fullRefund ? ' is-active' : ''}`}>
+                <input type="radio" name="refund" checked={fullRefund} onChange={() => setFullRefund(true)} />
+                <span><strong>Yepjo cancelled: full refund</strong><small>Refund {fmtMoney(Number(cancelling.amount), settings.currency)} at the counter.</small></span>
+              </label>
+            </fieldset>
+          )}
           <Field label="Reason (optional, saved in the activity log)">
             <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} />
           </Field>

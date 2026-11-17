@@ -19,6 +19,7 @@ export function SignupsDialog({ kind, targetId, title, capacity, onClose }: {
   const [rejecting, setRejecting] = useState<Registration | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [fullRefund, setFullRefund] = useState(false);
 
   const load = useCallback(async () => {
     const col = kind === 'event' ? 'event_id' : 'dance_session_id';
@@ -40,7 +41,7 @@ export function SignupsDialog({ kind, targetId, title, capacity, onClose }: {
   const cancel = async () => {
     if (!cancelling) return;
     setBusy(true);
-    const { error: err } = await supabase.rpc('cancel_registration', { p_id: cancelling.id, p_reason: 'Cancelled by Yepjo' });
+    const { error: err } = await supabase.rpc('cancel_registration', { p_id: cancelling.id, p_reason: fullRefund ? 'Cancelled by Yepjo' : 'Cancelled for the customer', p_full_refund: fullRefund });
     setBusy(false);
     setCancelling(null);
     if (err) return toast(toAppError(err).message, 'error');
@@ -96,7 +97,13 @@ export function SignupsDialog({ kind, targetId, title, capacity, onClose }: {
       </div>
       {cancelling && (
         <Confirm title="Cancel this sign-up?" confirmLabel="Cancel sign-up" danger busy={busy} onConfirm={() => void cancel()} onClose={() => setCancelling(null)}>
-          <p>{cancelling.customer_name} ({cancelling.reference}) loses their place.{cancelling.payment_status === 'verified' ? ' They already paid: arrange a refund.' : ''}</p>
+          <p>{cancelling.customer_name} ({cancelling.reference}) loses their place.</p>
+          {cancelling.payment_status === 'verified' && Number(cancelling.amount) > 0 && (
+            <label className="check">
+              <input type="checkbox" checked={fullRefund} onChange={(e) => setFullRefund(e.target.checked)} />
+              <span>Yepjo cancelled: full refund of {fmtMoney(Number(cancelling.amount), settings.currency)} (otherwise {settings.cancel_fee_percent ?? 50}% fee is kept)</span>
+            </label>
+          )}
         </Confirm>
       )}
       {rejecting && (

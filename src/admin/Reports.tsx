@@ -24,6 +24,8 @@ interface Report {
   sports: SportRow[]; hours_of_day: { hour: number; bookings: number }[]; rows: Row[];
 }
 
+interface Extras { cafe_sales: number; cafe_orders: number; cancel_fees: number; signup_sales: number; refunds_waiting: number }
+
 const n = (v: unknown) => Number(v ?? 0);
 const monthOf = (ymd: string) => ymd.slice(0, 7);
 const shiftMonth = (ym: string, by: number) => {
@@ -53,6 +55,7 @@ export default function Reports() {
     return q && /^\d{4}-\d{2}$/.test(q) ? q : thisMonth;
   });
   const [data, setData] = useState<Report | null>(null);
+  const [extras, setExtras] = useState<Extras | null>(null);
   const [error, setError] = useState<string | null>(null);
   const money = useCallback((v: number) => fmtMoney(v, settings.currency), [settings.currency]);
 
@@ -61,6 +64,8 @@ export default function Reports() {
     if (err) { setError(toAppError(err).message); return; }
     setError(null);
     setData(d as Report);
+    const { data: x } = await supabase.rpc('admin_report_extras', { p_month: `${month}-01` });
+    setExtras((x as Extras) ?? null);
   }, [month]);
 
   useEffect(() => { setData(null); void load(); }, [load]);
@@ -159,6 +164,27 @@ export default function Reports() {
               <span className="stat-label">Customers</span>
             </div>
           </div>
+
+          {extras && (
+            <div className="stat-row stat-row-sub">
+              <div className="stat card">
+                <span className="stat-num">{money(n(extras.cafe_sales))}</span>
+                <span className="stat-label">Cafe orders paid · {n(extras.cafe_orders)} order{n(extras.cafe_orders) === 1 ? '' : 's'}</span>
+              </div>
+              <div className="stat card">
+                <span className="stat-num">{money(n(extras.signup_sales))}</span>
+                <span className="stat-label">Events &amp; dance sign-ups</span>
+              </div>
+              <div className="stat card">
+                <span className="stat-num">{money(n(extras.cancel_fees))}</span>
+                <span className="stat-label">Cancellation fees kept</span>
+              </div>
+              <div className="stat card">
+                <span className="stat-num">{n(extras.refunds_waiting)}</span>
+                <span className="stat-label">Refunds waiting to be collected (all months)</span>
+              </div>
+            </div>
+          )}
 
           {n(t.bookings) === 0 && n(t.cancelled) === 0 && n(t.pending) === 0 ? (
             <Empty icon="chart" title={`No sales in ${monthLabel(month)}`}>Confirmed bookings and walk-ins will show up here.</Empty>

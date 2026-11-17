@@ -48,7 +48,7 @@ export interface Payable {
 }
 
 export function PaymentPanel<T extends Payable>({ booking, onChange, rpc = 'submit_payment', what = 'booking' }: {
-  booking: T; onChange: (r: T) => void; rpc?: 'submit_payment' | 'submit_registration_payment'; what?: string;
+  booking: T; onChange: (r: T) => void; rpc?: 'submit_payment' | 'submit_registration_payment' | 'submit_order_payment'; what?: string;
 }) {
   const { settings } = useSite();
   const online = useOnline();

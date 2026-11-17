@@ -81,13 +81,19 @@ export function MySignups({ tab }: { tab: 'upcoming' | 'history' }) {
               {r.kind === 'event' && r.event && (
                 <p className="small">{EVENT_KIND_LABEL[r.event.kind]} · {fmtDateLong(toUtcMs(r.event.starts_on, 720))}{r.event.ends_on !== r.event.starts_on ? ` – ${fmtDateLong(toUtcMs(r.event.ends_on, 720))}` : ''} · {fmtClock(r.event.start_time)}–{fmtClock(r.event.end_time)}</p>
               )}
+              {r.status === 'cancelled' && Number(r.refund_amount ?? 0) > 0 && (
+                <p className={`small refund-note ${r.refund_status === 'claimed' ? 'is-done' : ''}`}>
+                  {r.refund_status === 'claimed' ? `Refund of ${fmtMoney(Number(r.refund_amount), settings.currency)} received.`
+                    : `Refund ${fmtMoney(Number(r.refund_amount), settings.currency)}: claim it in person at Yepjo with reference ${r.reference}.`}
+                </p>
+              )}
               <p className="tiny muted">{Number(r.amount) > 0 ? `${fmtMoney(Number(r.amount), settings.currency)} · ${r.payment_method === 'venue' ? 'pay at the venue' : 'paid by QR'}` : 'Free'}</p>
               {upcoming && r.status === 'pending' && (
                 <PaymentPanel booking={r} onChange={() => void load()} rpc="submit_registration_payment" what={r.kind === 'dance' ? 'class booking' : 'registration'} />
               )}
               <div className="booking-foot">
                 <span className="ref">Ref. {r.reference}</span>
-                {upcoming && !started && r.payment_status !== 'submitted' && r.payment_status !== 'verified' && (
+                {upcoming && !started && r.payment_status !== 'submitted' && startOf(r) - (settings.cancel_cutoff_hours * 3_600_000) > now && (
                   <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setTarget(r)}>Cancel</button>
                 )}
               </div>
@@ -97,6 +103,12 @@ export function MySignups({ tab }: { tab: 'upcoming' | 'history' }) {
       </ul>
       {target && (
         <Confirm title="Cancel this sign-up?" confirmLabel="Cancel sign-up" danger busy={busy} onConfirm={() => void cancel()} onClose={() => setTarget(null)}>
+          {target.payment_status === 'verified' && Number(target.amount) > 0 && (
+            <div className="fee-box">
+              <p><strong>Cancellation fee: {fmtMoney(Number(target.amount) * (settings.cancel_fee_percent ?? 50) / 100, settings.currency)}</strong> ({settings.cancel_fee_percent ?? 50}%).</p>
+              <p>The other {fmtMoney(Number(target.amount) * (100 - (settings.cancel_fee_percent ?? 50)) / 100, settings.currency)} is refunded in person at Yepjo, not online.</p>
+            </div>
+          )}
           <p>Your place will be given to someone else.</p>
         </Confirm>
       )}

@@ -70,6 +70,9 @@ export default function MyBookings() {
   const canCancel = (r: Reservation) => r.status === 'pending'
     ? r.payment_status !== 'submitted'
     : settings.allow_cancellation && new Date(r.starts_at).getTime() - cutoffMs > now;
+  const feePct = settings.cancel_fee_percent ?? 50;
+  const paidOnline = (r: Reservation) => r.payment_status === 'verified' && Number(r.amount ?? 0) > 0;
+  const money = (v: number) => fmtMoney(v, settings.currency);
   const replace = (saved: Reservation) => setRows((rs) => (rs ?? []).map((x) => (x.id === saved.id ? { ...x, ...saved } : x)));
 
   const cancel = async () => {
@@ -80,7 +83,9 @@ export default function MyBookings() {
     if (err) {
       toast(toAppError(err).message, 'error');
     } else {
-      toast(`Booking ${target.reference} was cancelled. The slot is open again.`);
+      toast(paidOnline(target)
+        ? `Booking ${target.reference} cancelled. Claim your ${money(Number(target.amount) * (100 - feePct) / 100)} refund in person at Yepjo.`
+        : `Booking ${target.reference} was cancelled. The slot is open again.`);
       setTarget(null);
     }
     void load();
@@ -126,6 +131,13 @@ export default function MyBookings() {
               <p>{fmtDateLong(r.starts_at)}</p>
               <p className="small">{fmtRange(r.starts_at, r.ends_at)} · {fmtDuration(minutes)}{r.amount != null ? ` · ${fmtMoney(Number(r.amount), settings.currency)}` : ''}</p>
               {r.status === 'cancelled' && r.cancel_reason && <p className="tiny muted">{r.cancel_reason}</p>}
+              {r.status === 'cancelled' && Number(r.refund_amount ?? 0) > 0 && (
+                <p className={`small refund-note ${r.refund_status === 'claimed' ? 'is-done' : ''}`}>
+                  {r.refund_status === 'claimed'
+                    ? `Refund of ${money(Number(r.refund_amount))} received at Yepjo.`
+                    : `Refund ${money(Number(r.refund_amount))}: claim it in person at Yepjo${Number(r.cancel_fee ?? 0) > 0 ? ` (${money(Number(r.cancel_fee))} cancellation fee kept)` : ''}. Bring your reference ${r.reference}.`}
+                </p>
+              )}
               {isUpcoming(r) && r.status === 'pending' && <PaymentPanel booking={r} onChange={replace} />}
               <div className="booking-foot">
                 <span className="ref">Ref. {r.reference}</span>
@@ -148,6 +160,12 @@ export default function MyBookings() {
         <Confirm title="Cancel this booking?" confirmLabel="Cancel booking" danger busy={busy} onConfirm={() => void cancel()} onClose={() => setTarget(null)}>
           <p>{target.court ? `${SPORT_LABEL[target.court.sport]} · ${target.court.name}` : ''}</p>
           <p>{fmtDateLong(target.starts_at)}<br />{fmtRange(target.starts_at, target.ends_at)}</p>
+          {paidOnline(target) ? (
+            <div className="fee-box">
+              <p><strong>Cancellation fee: {money(Number(target.amount) * feePct / 100)}</strong> ({feePct}% of {money(Number(target.amount))}).</p>
+              <p>The other <strong>{money(Number(target.amount) * (100 - feePct) / 100)}</strong> is not refunded online. Claim it in person at Yepjo with your reference {target.reference}.</p>
+            </div>
+          ) : null}
           <p className="muted small">The slot will be released for others to book. This cannot be undone.</p>
         </Confirm>
       )}

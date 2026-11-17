@@ -34,6 +34,11 @@ export const DEFAULT_SETTINGS: Settings = {
   points_purchase_amount: 200,
   points_dance_booking: 1,
   points_event: 0,
+  cancel_fee_percent: 50,
+  cafe_opens: '07:00',
+  cafe_closes: '01:00',
+  cafe_ordering_enabled: true,
+  cafe_prep_minutes: 15,
 };
 
 interface SiteState {
