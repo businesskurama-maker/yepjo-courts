@@ -1019,8 +1019,8 @@ select option:disabled { color: #6b7280; }
 .food-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; transition: border-color .15s; }
 .food-card.in-cart { border-color: var(--lime); }
 .food-card.is-out { opacity: .55; }
-.food-media { position: relative; aspect-ratio: 4 / 3; background: #0e1114; display: block; }
-.food-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.food-media { position: relative; aspect-ratio: 4 / 3; background: #0e1114; display: block; overflow: hidden; min-height: 0; }
+.food-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 35%; display: block; }
 .food-art { position: absolute; inset: 0; display: grid; place-items: center; color: var(--lime); background: radial-gradient(circle at 30% 25%, rgba(198,244,50,.16), transparent 60%), #111417; }
 .food-flag { position: absolute; left: 8px; top: 8px; padding: 2px 8px; border-radius: 99px; font-size: .68rem; font-weight: 700; background: rgba(255,107,107,.9); color: #fff; }
 .food-flag.is-info { background: rgba(11,12,13,.82); color: var(--lime); }
@@ -1097,8 +1097,8 @@ select option:disabled { color: #6b7280; }
 .prize-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .prize { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
 .prize.is-ready { border-color: var(--lime); box-shadow: 0 0 0 1px var(--lime) inset; }
-.prize-media { position: relative; display: block; aspect-ratio: 16 / 9; background: #111417; }
-.prize-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prize-media { position: relative; display: block; aspect-ratio: 16 / 9; background: #111417; overflow: hidden; }
+.prize-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .prize-art { position: absolute; inset: 0; display: grid; place-items: center; color: #ffb020; background: radial-gradient(circle at 30% 30%, rgba(255,176,32,.22), transparent 60%), #14120d; }
 .prize-cost { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; background: rgba(11,12,13,.85); color: #ffb020; font-weight: 700; font-size: .8rem; }
 .prize-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; flex: 1; }
