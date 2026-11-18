@@ -126,7 +126,10 @@ export function ExtensionsPanel() {
                 <strong>{r.customer_name ?? 'Customer'} · <span className="warn-text">{money(Number(r.extra_unpaid))}</span></strong>
                 <span className="small muted">{courtName(r.court_id)} · {fmtDateShort(r.starts_at)}, {fmtRange(r.starts_at, r.ends_at)} · {r.reference}</span>
               </span>
-              <button type="button" className="btn btn-sm btn-primary" onClick={() => setPaying(r)}>Mark paid</button>
+              <span className="btn-row">
+                {new Date(r.ends_at).getTime() > Date.now() - 3_600_000 && <button type="button" className="btn btn-sm btn-outline" onClick={() => setExtending(r)}><Icon name="clock" size={15} /> Extend more</button>}
+                <button type="button" className="btn btn-sm btn-primary" onClick={() => setPaying(r)}>Mark paid</button>
+              </span>
             </li>
           ))}
         </ul>
