@@ -189,7 +189,7 @@ export function PhotoPicker({ folder, onUploaded, onClose, title = 'Add photo' }
         <div className="photo-drop">
           <Icon name="image" size={32} />
           <p>Choose a photo from this device.</p>
-          <p className="muted small">It is automatically converted to WebP and compressed to 300 KB or less before upload.</p>
+          <p className="muted small">It is automatically converted and compressed to 300 KB or less before upload.</p>
           <label className="btn btn-primary">
             <Icon name="plus" size={18} /> Choose photo
             <input ref={inputRef} type="file" accept="image/*" className="sr-only" onChange={onFile} />
@@ -263,7 +263,7 @@ export function PhotoPicker({ folder, onUploaded, onClose, title = 'Add photo' }
         <div className="photo-result">
           <img src={previewUrl} alt="Processed preview" className="photo-preview" />
           <dl className="facts">
-            <div><dt>Format</dt><dd>WebP</dd></div>
+            <div><dt>Format</dt><dd>{result.blob.type === 'image/jpeg' ? 'JPEG' : 'WebP'}</dd></div>
             <div><dt>Final size</dt><dd>{result.bytes.toLocaleString()} bytes ({fmtBytes(result.bytes)}) <span className="badge badge-ok">≤ {MAX_PHOTO_BYTES / 1000} KB</span></dd></div>
             <div><dt>Dimensions</dt><dd>{result.width}×{result.height}px</dd></div>
             <div><dt>Quality</dt><dd>{Math.round(result.quality * 100)}%</dd></div>

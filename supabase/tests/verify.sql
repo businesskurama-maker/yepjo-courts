@@ -231,7 +231,7 @@ begin
     'admin.grant, admin.revoke, announcements.insert, announcements.update, carousel_photos.insert, conversation.delete, reservation.block, reservation.cancel, reservation.walk_in, settings.update',
     'admin actions were logged');
   perform t.eq((select file_size_limit || '|' || allowed_mime_types::text || '|' || public from storage.buckets where id = 'photos'),
-    '300000|{image/webp}|true', 'bucket only accepts WebP up to 300,000 bytes');
+    '300000|{image/webp,image/jpeg}|true', 'bucket only accepts WebP up to 300,000 bytes');
   perform t.eq((select count(*)::text from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd in ('INSERT', 'UPDATE', 'ALL')),
     '0', 'no client role can upload directly (Edge Function only)');
   perform t.eq((select count(*)::text from pg_tables where schemaname = 'public' and not rowsecurity), '0', 'RLS is enabled on every public table');

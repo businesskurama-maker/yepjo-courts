@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MySignups } from '../components/MySignups';
-import { Confirm, Empty, GoogleButton, Icon, Notice, Pager, Spinner, useOnline, useToast } from '../components/ui';
+import { Confirm, Empty, GoogleButton, Icon, Modal, Notice, Pager, Spinner, useOnline, useToast } from '../components/ui';
 import { Link } from '../lib/router';
 import { supabase, toAppError } from '../lib/supabase';
-import { fmtDateLong, fmtDuration, fmtMoney, fmtRange } from '../lib/time';
+import { fmtDateLong, fmtDuration, fmtMoney, fmtRange, fmtTime } from '../lib/time';
 import { SPORT_LABEL, awaitingPayment, type Reservation } from '../lib/types';
 import { PaymentPanel, bookingBadge } from '../components/Payment';
 import { useAuth } from '../state/auth';
@@ -22,6 +22,9 @@ export default function MyBookings() {
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<Reservation | null>(null);
   const [busy, setBusy] = useState(false);
+  const [extending, setExtending] = useState<Reservation | null>(null);
+  const [extHours, setExtHours] = useState(1);
+  const [extError, setExtError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const userId = auth.user?.id;
 
@@ -74,6 +77,21 @@ export default function MyBookings() {
   const paidOnline = (r: Reservation) => r.payment_status === 'verified' && Number(r.amount ?? 0) > 0;
   const money = (v: number) => fmtMoney(v, settings.currency);
   const replace = (saved: Reservation) => setRows((rs) => (rs ?? []).map((x) => (x.id === saved.id ? { ...x, ...saved } : x)));
+
+  const askExtend = async () => {
+    if (!extending) return;
+    setBusy(true); setExtError(null);
+    const { data, error: err } = await supabase.rpc('request_extension', { p_id: extending.id, p_minutes: extHours * 60 });
+    setBusy(false);
+    if (err) return setExtError(toAppError(err).message);
+    replace(data as Reservation); setExtending(null);
+    toast('Request sent. Yepjo staff will confirm your extra time.');
+  };
+  const withdraw = async (r: Reservation) => {
+    const { data, error: err } = await supabase.rpc('clear_extension_request', { p_id: r.id });
+    if (err) return toast(toAppError(err).message, 'error');
+    replace(data as Reservation);
+  };
 
   const cancel = async () => {
     if (!target) return;
@@ -139,6 +157,19 @@ export default function MyBookings() {
                 </p>
               )}
               {isUpcoming(r) && r.status === 'pending' && <PaymentPanel booking={r} onChange={replace} />}
+              {Number(r.extra_minutes ?? 0) > 0 && r.status === 'confirmed' && (
+                <p className="small refund-note is-done">Extended by {fmtDuration(Number(r.extra_minutes))}.{Number(r.extra_unpaid ?? 0) > 0 ? ` Please pay ${money(Number(r.extra_unpaid))} for the extra time at the counter.` : ''}</p>
+              )}
+              {isUpcoming(r) && r.status === 'confirmed' && (r.extend_request_minutes ? (
+                <p className="small extend-wait">
+                  <Icon name="clock" size={15} /> You asked for +{fmtDuration(r.extend_request_minutes)}. Waiting for Yepjo staff to approve.{' '}
+                  <button type="button" className="link" onClick={() => void withdraw(r)}>Withdraw</button>
+                </p>
+              ) : (
+                <button type="button" className="btn btn-sm btn-outline extend-btn" onClick={() => { setExtHours(1); setExtError(null); setExtending(r); }} disabled={!online}>
+                  <Icon name="clock" size={16} /> Extend time
+                </button>
+              ))}
               <div className="booking-foot">
                 <span className="ref">Ref. {r.reference}</span>
                 {isUpcoming(r) && (canCancel(r)
@@ -155,6 +186,29 @@ export default function MyBookings() {
       </ul>
       <Pager page={page} pageSize={PAGE_SIZE} total={list.length} onPage={setPage} />
       <MySignups tab={tab} />
+
+      {extending && (
+        <Modal title="Extend your time" onClose={() => setExtending(null)} footer={
+          <>
+            <button type="button" className="btn btn-ghost" onClick={() => setExtending(null)} disabled={busy}>Close</button>
+            <button type="button" className="btn btn-primary" onClick={() => void askExtend()} disabled={busy}>{busy ? 'Sending…' : 'Ask Yepjo staff'}</button>
+          </>
+        }>
+          <div className="stack-sm">
+            <p>{extending.court ? `${SPORT_LABEL[extending.court.sport]} · ${extending.court.name}` : 'Court'}<br /><span className="muted small">Now {fmtRange(extending.starts_at, extending.ends_at)}</span></p>
+            <div className="chip-row" role="radiogroup" aria-label="Extra hours">
+              {[1, 2].map((h) => (
+                <button key={h} type="button" role="radio" aria-checked={extHours === h} className={`chip${extHours === h ? ' is-active' : ''}`} onClick={() => { setExtHours(h); setExtError(null); }}>
+                  +{h} hour{h === 1 ? '' : 's'}
+                </button>
+              ))}
+            </div>
+            <p className="small">New end time: <strong>{fmtTime(new Date(new Date(extending.ends_at).getTime() + extHours * 3_600_000).toISOString())}</strong></p>
+            <p className="tiny muted">You can only ask while the next hour is still free. Staff will approve it and tell you how to pay for the extra time.</p>
+            {extError && <Notice kind="error">{extError}</Notice>}
+          </div>
+        </Modal>
+      )}
 
       {target && (
         <Confirm title="Cancel this booking?" confirmLabel="Cancel booking" danger busy={busy} onConfirm={() => void cancel()} onClose={() => setTarget(null)}>

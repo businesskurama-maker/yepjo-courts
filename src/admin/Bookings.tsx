@@ -7,6 +7,7 @@ import {
 } from '../lib/time';
 import { SPORTS, SPORT_LABEL, type Reservation, type ReservationKind, type Sport } from '../lib/types';
 import { useSite } from '../state/site';
+import { ExtendDialog, ExtensionsPanel } from './Extend';
 
 const KIND_LABEL: Record<ReservationKind, string> = { online: 'Online', walk_in: 'Walk-in', block: 'Block' };
 
@@ -32,6 +33,7 @@ export default function Bookings() {
   const [fullRefund, setFullRefund] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<'walk_in' | 'block' | null>(null);
+  const [extending, setExtending] = useState<Reservation | null>(null);
 
   const courtOptions = useMemo(() => courts.filter((c) => !sport || c.sport === sport), [courts, sport]);
   const courtName = (id: number) => {
@@ -126,6 +128,7 @@ export default function Bookings() {
         {date && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDate(''); resetPage(); }}>All dates</button>}
       </div>
 
+      <ExtensionsPanel />
       {error && <Notice kind="error" action={<button type="button" className="btn btn-sm" onClick={() => void load()}>Retry</button>}>{error}</Notice>}
       {rows === null && !error && <Spinner />}
       {rows !== null && rows.length === 0 && <Empty icon="ticket" title="No reservations match these filters" />}
@@ -144,6 +147,8 @@ export default function Bookings() {
                   <span className="badges">
                     <span className={`badge ${r.kind === 'block' ? 'badge-off' : ''}`}>{KIND_LABEL[r.kind]}</span>
                     {r.status === 'cancelled' && <span className="badge badge-off">Cancelled</span>}
+                    {r.extend_request_minutes ? <span className="badge badge-warn">Wants +{fmtDuration(r.extend_request_minutes)}</span> : null}
+                    {Number(r.extra_unpaid ?? 0) > 0 && <span className="badge badge-warn">Extension unpaid</span>}
                   </span>
                 </span>
                 <Icon name="right" size={16} />
@@ -154,10 +159,14 @@ export default function Bookings() {
       )}
       <Pager page={page} pageSize={pageSize} total={total} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1); }} />
 
+      {extending && <ExtendDialog booking={extending} onClose={() => setExtending(null)} onDone={() => { setExtending(null); void load(); }} />}
       {detail && (
         <Modal title={`${KIND_LABEL[detail.kind]} · ${detail.reference}`} onClose={() => setDetail(null)} footer={
           detail.status === 'confirmed'
-            ? <button type="button" className="btn btn-outline-danger" onClick={() => setCancelling(detail)}>{detail.kind === 'block' ? 'Remove block' : 'Cancel reservation'}</button>
+            ? <>
+                <button type="button" className="btn btn-outline-danger" onClick={() => setCancelling(detail)}>{detail.kind === 'block' ? 'Remove block' : 'Cancel reservation'}</button>
+                {detail.kind !== 'block' && <button type="button" className="btn btn-primary" onClick={() => { setExtending(detail); setDetail(null); }}><Icon name="clock" size={16} /> Extend time</button>}
+              </>
             : undefined
         }>
           <dl className="facts">
@@ -169,6 +178,8 @@ export default function Bookings() {
             {detail.customer_phone && <div><dt>Contact no.</dt><dd><a className="link" href={`tel:${detail.customer_phone}`}>{detail.customer_phone}</a></dd></div>}
             {detail.customer_email && <div><dt>Email</dt><dd><a className="link" href={`mailto:${detail.customer_email}`}>{detail.customer_email}</a></dd></div>}
             {detail.amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(Number(detail.amount), settings.currency)}</dd></div>}
+            {Number(detail.extra_minutes ?? 0) > 0 && <div><dt>Extended by</dt><dd>{fmtDuration(Number(detail.extra_minutes))} · {fmtMoney(Number(detail.extra_amount ?? 0), settings.currency)}{Number(detail.extra_unpaid ?? 0) > 0 ? ` (${fmtMoney(Number(detail.extra_unpaid), settings.currency)} not paid yet)` : ' (paid)'}</dd></div>}
+            {detail.extend_request_minutes ? <div><dt>Request</dt><dd>Customer asked for +{fmtDuration(detail.extend_request_minutes)}</dd></div> : null}
             {detail.note && <div><dt>{detail.kind === 'block' ? 'Reason' : 'Note'}</dt><dd>{detail.note}</dd></div>}
             {detail.cancel_reason && <div><dt>Cancel reason</dt><dd>{detail.cancel_reason}</dd></div>}
             <div><dt>Created</dt><dd>{fmtDateTime(detail.created_at)}</dd></div>

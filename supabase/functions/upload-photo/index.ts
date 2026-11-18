@@ -80,13 +80,17 @@ Deno.serve(async (req: Request) => {
     const bytes = new Uint8Array(await req.arrayBuffer());
     if (bytes.length === 0) return reply(400, { error: "The upload was empty." });
     if (bytes.length > MAX_BYTES) return reply(413, { error: "Photo is larger than 300 KB (300,000 bytes)." });
-    if (!isWebp(bytes)) return reply(415, { error: "Photo is not a valid WebP file." });
+    // Safari cannot create WebP, so a genuine JPEG is accepted too.
+    const jpeg = bytes.length > 20 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff &&
+      bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9;
+    if (!jpeg && !isWebp(bytes)) return reply(415, { error: "Photo is not a valid WebP or JPEG file." });
+    const mime = jpeg ? "image/jpeg" : "image/webp";
 
     // 4. Store it.
-    const path = `${folder}/${crypto.randomUUID()}.webp`;
+    const path = `${folder}/${crypto.randomUUID()}.${jpeg ? "jpg" : "webp"}`;
     const up = await fetch(`${base}/storage/v1/object/${BUCKET}/${path}`, {
       method: "POST",
-      headers: { ...svc, "Content-Type": "image/webp", "Cache-Control": "max-age=31536000", "x-upsert": "false" },
+      headers: { ...svc, "Content-Type": mime, "Cache-Control": "max-age=31536000", "x-upsert": "false" },
       body: bytes,
     });
     if (!up.ok) {

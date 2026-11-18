@@ -5,6 +5,7 @@ import { supabase, toAppError } from '../lib/supabase';
 import { DAY_MS, fmtDateLong, fmtDateTime, fmtRange, toUtcMs, todayYmd } from '../lib/time';
 import { SPORT_LABEL, type ActivityLog, type Reservation } from '../lib/types';
 import { useAuth } from '../state/auth';
+import { ExtensionsPanel } from './Extend';
 import { useSite } from '../state/site';
 import Bookings from './Bookings';
 import Courts from './Courts';
@@ -71,6 +72,20 @@ function usePaymentsToCheck(): number {
   return count;
 }
 
+/** Customers waiting for staff to approve extra court time. */
+function useExtensionRequests(): number {
+  const { pulse } = useSite();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    void supabase.from('reservations').select('id', { count: 'exact', head: true }).eq('status', 'confirmed')
+      .not('extend_request_minutes', 'is', null).gt('ends_at', new Date(Date.now() - 3_600_000).toISOString())
+      .then(({ count: c }) => alive && setCount(c ?? 0));
+    return () => { alive = false; };
+  }, [pulse]);
+  return count;
+}
+
 /** Cafe orders that need the kitchen's attention (payment to check, or paid and not yet ready). */
 function useCafeToDo(): number {
   const { pulse } = useSite();
@@ -119,6 +134,7 @@ function AdminArea({ path }: { path: string }) {
   const unread = useUnreadInquiries();
   const toCheck = usePaymentsToCheck();
   const cafeToDo = useCafeToDo();
+  const extReqs = useExtensionRequests();
   const active = (to: string) => (to === '/admin' ? path === '/admin' : path.startsWith(to));
 
   let page;
@@ -147,6 +163,7 @@ function AdminArea({ path }: { path: string }) {
             <Icon name={t.icon} size={18} />
             <span>{t.label}</span>
             {t.to === '/admin/inbox' && unread > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${unread} unread`}>{unread}</span>}
+            {t.to === '/admin/bookings' && extReqs > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${extReqs} extension requests`}>{extReqs}</span>}
             {t.to === '/admin/cafe' && cafeToDo > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${cafeToDo} new cafe orders`}>{cafeToDo}</span>}
             {t.to === '/admin/payments' && toCheck > 0 && <span className="nav-badge nav-badge-inline" aria-label={`${toCheck} to check`}>{toCheck}</span>}
           </Link>
@@ -220,6 +237,7 @@ function Dashboard({ unread, toCheck }: { unread: number; toCheck: number }) {
         </Link>
       </div>
 
+      <ExtensionsPanel />
       <div className="dash-grid">
       <section className="card dash-today" aria-labelledby="today-h">
         <div className="card-head">

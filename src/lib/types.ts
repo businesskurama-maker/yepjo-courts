@@ -126,6 +126,11 @@ export interface Reservation {
   cancel_fee?: number | null;
   refund_amount?: number | null;
   refund_status?: 'none' | 'to_claim' | 'claimed';
+  extra_minutes?: number;
+  extra_amount?: number;
+  extra_unpaid?: number;
+  extend_request_minutes?: number | null;
+  extend_requested_at?: string | null;
   court?: Pick<Court, 'id' | 'name' | 'sport'> | null;
 }
 

@@ -74,8 +74,21 @@ export async function isWebp(blob: Blob): Promise<boolean> {
   return tag(0) === 'RIFF' && tag(8) === 'WEBP' && tag(12).startsWith('VP8');
 }
 
-function encode(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+export async function isJpeg(blob: Blob): Promise<boolean> {
+  if (blob.size < 20) return false;
+  const b = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
+  return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+}
+
+/** A photo we are willing to upload: genuine WebP, or genuine JPEG (Safari cannot create WebP). */
+export async function isAllowedPhoto(blob: Blob): Promise<boolean> {
+  return (blob.type === 'image/webp' && (await isWebp(blob))) || (blob.type === 'image/jpeg' && (await isJpeg(blob)));
+}
+
+type PhotoType = 'image/webp' | 'image/jpeg';
+
+function encode(canvas: HTMLCanvasElement, quality: number, type: PhotoType): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
 /**
@@ -96,6 +109,8 @@ export async function processPhoto(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new PhotoError('This browser cannot process images. Try a different browser.');
 
+  // Safari (iPhone, iPad, Mac) cannot create WebP: it silently hands back a PNG. Use JPEG there.
+  let type: PhotoType = 'image/webp';
   const totalSteps = 6 * QUALITIES.length;
   let step = 0;
   for (let pass = 0; pass < 6; pass++) {
@@ -106,6 +121,7 @@ export async function processPhoto(
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, w, h);
+    if (type === 'image/jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); }
     ctx.drawImage(img.source, area.sx, area.sy, area.sw, area.sh, 0, 0, w, h);
 
     for (const quality of QUALITIES) {
@@ -114,12 +130,19 @@ export async function processPhoto(
         percent: Math.min(95, Math.round((step / totalSteps) * 100)),
         label: `Compressing… ${w}×${h}px at ${Math.round(quality * 100)}% quality`,
       });
-      const blob = await encode(canvas, quality);
+      let blob = await encode(canvas, quality, type);
+      if (type === 'image/webp' && (!blob || blob.type !== 'image/webp' || !(await isWebp(blob)))) {
+        type = 'image/jpeg';
+        // JPEG has no transparency: put the picture on white first.
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.globalCompositeOperation = 'source-over';
+        blob = await encode(canvas, quality, type);
+      }
       if (!blob) throw new PhotoError('The photo could not be compressed. Please try again or pick another photo.');
-      if (blob.type !== 'image/webp' || !(await isWebp(blob))) {
-        throw new PhotoError(
-          'This browser cannot create WebP images, so the photo was not uploaded. Please use a current version of Chrome, Edge or Firefox on a computer or Android device.',
-        );
+      if (!(await isAllowedPhoto(blob))) {
+        throw new PhotoError('This browser could not prepare the photo. Please try again, or use another browser.');
       }
       if (blob.size <= MAX_PHOTO_BYTES) {
         onProgress({ percent: 100, label: 'Optimised' });
@@ -138,8 +161,8 @@ export type PhotoFolder = 'carousel' | 'announcements' | 'payments';
 
 /** Sends a processed photo through the trusted upload function. Returns its storage path. */
 export async function uploadPhoto(photo: ProcessedPhoto, folder: PhotoFolder): Promise<string> {
-  if (photo.blob.size > MAX_PHOTO_BYTES || !(await isWebp(photo.blob))) {
-    throw new PhotoError('The photo is not a WebP file of 300 KB or less.');
+  if (photo.blob.size > MAX_PHOTO_BYTES || !(await isAllowedPhoto(photo.blob))) {
+    throw new PhotoError('The photo is not a WebP or JPEG file of 300 KB or less.');
   }
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -148,7 +171,7 @@ export async function uploadPhoto(photo: ProcessedPhoto, folder: PhotoFolder): P
   try {
     res = await fetch(`${SUPABASE_URL}/functions/v1/upload-photo`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY, 'Content-Type': 'image/webp', 'x-folder': folder },
+      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY, 'Content-Type': photo.blob.type, 'x-folder': folder },
       body: photo.blob,
     });
   } catch {

@@ -1371,3 +1371,9 @@ h2 { font-size: 1.05rem; letter-spacing: .07em; }
 .slot.slot-range.is-selected { border-radius: 12px; }
 @media (max-width: 380px) { .slot-grid:has(.slot-range) { grid-template-columns: 1fr 1fr; } .slot.slot-range { font-size: .74rem; } }
 .slot.slot-range.is-selected small { color: var(--lime-ink); opacity: .75; }
+
+/* booking extensions */
+.extend-btn { align-self: flex-start; }
+.extend-wait { padding: 8px 10px; border-radius: 10px; background: rgba(255, 201, 77, .1); color: var(--amber); }
+.extend-wait svg { vertical-align: -2px; margin-right: 4px; }
+.extend-wait .link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
