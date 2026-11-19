@@ -1377,3 +1377,23 @@ h2 { font-size: 1.05rem; letter-spacing: .07em; }
 .extend-wait { padding: 8px 10px; border-radius: 10px; background: rgba(255, 201, 77, .1); color: var(--amber); }
 .extend-wait svg { vertical-align: -2px; margin-right: 4px; }
 .extend-wait .link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+
+/* vouchers */
+.voucher-box { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; border: 1px dashed var(--line); background: var(--surface-2); }
+.voucher-row { display: flex; gap: 8px; }
+.voucher-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.voucher-box .ok-text svg { vertical-align: -2px; }
+.fact-discount dt, .fact-discount dd { color: var(--lime); }
+.fact-total { border-top: 1px dashed var(--line); padding-top: 6px; }
+.fact-total dd { font-size: 1.15rem; font-weight: 800; color: var(--lime); }
+.voucher-fresh { border: 1px solid var(--lime); border-radius: 12px; padding: 10px 12px; background: rgba(198, 244, 50, .05); display: flex; flex-direction: column; gap: 8px; }
+.voucher-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; max-height: 180px; overflow-y: auto; }
+.voucher-codes code, .voucher-code code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .05em; color: var(--lime); font-size: .9rem; }
+.voucher-list { display: flex; flex-direction: column; max-height: calc(calc(100dvh / var(--z)) - var(--topbar) - 250px); min-height: 200px; overflow-y: auto; scrollbar-width: thin; }
+.voucher-item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.voucher-item:last-child { border-bottom: 0; }
+.voucher-item.is-dim .voucher-main, .voucher-item.is-dim .voucher-code { opacity: .55; }
+.voucher-code { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1px dashed rgba(198, 244, 50, .5); background: var(--bg); color: var(--muted); cursor: pointer; }
+.voucher-main { display: flex; flex-direction: column; min-width: 0; }
+.voucher-main strong { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
+@media (max-width: 520px) { .voucher-item { grid-template-columns: 1fr auto; } .voucher-code { grid-column: 1 / -1; justify-self: start; } }

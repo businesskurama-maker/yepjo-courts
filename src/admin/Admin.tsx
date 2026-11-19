@@ -18,6 +18,7 @@ import EventsAdmin from './EventsAdmin';
 import DanceAdmin from './DanceAdmin';
 import CafeAdmin from './CafeAdmin';
 import RewardsAdmin from './RewardsAdmin';
+import Vouchers from './Vouchers';
 import Scan from './Scan';
 
 const TABS = [
@@ -31,6 +32,7 @@ const TABS = [
   { to: '/admin/dance', label: 'Step Up Dance', icon: 'dance' },
   { to: '/admin/cafe', label: 'Cafe', icon: 'cup' },
   { to: '/admin/rewards', label: 'Rewards', icon: 'gift' },
+  { to: '/admin/vouchers', label: 'Vouchers', icon: 'ticket' },
   { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
   { to: '/admin/photos', label: 'Photos', icon: 'image' },
   { to: '/admin/inbox', label: 'Inbox', icon: 'chat' },
@@ -148,6 +150,7 @@ function AdminArea({ path }: { path: string }) {
   else if (path.startsWith('/admin/dance')) page = <DanceAdmin />;
   else if (path.startsWith('/admin/cafe')) page = <CafeAdmin />;
   else if (path.startsWith('/admin/rewards')) page = <RewardsAdmin />;
+  else if (path.startsWith('/admin/vouchers')) page = <Vouchers />;
   else if (path.startsWith('/admin/announcements')) page = <Announcements />;
   else if (path.startsWith('/admin/photos')) page = <Photos />;
   else if (path.startsWith('/admin/inbox')) page = <Inbox />;

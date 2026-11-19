@@ -126,6 +126,8 @@ export interface Reservation {
   cancel_fee?: number | null;
   refund_amount?: number | null;
   refund_status?: 'none' | 'to_claim' | 'claimed';
+  voucher_code?: string | null;
+  discount?: number;
   extra_minutes?: number;
   extra_amount?: number;
   extra_unpaid?: number;
@@ -303,4 +305,19 @@ export interface CafeOrder {
   refund_status: 'none' | 'to_claim' | 'claimed';
   created_at: string;
   cancel_reason: string | null;
+}
+
+export interface Voucher {
+  id: string;
+  code: string;
+  kind: 'percent' | 'amount';
+  value: number;
+  note: string | null;
+  max_uses: number | null;
+  once_per_customer: boolean;
+  expires_on: string | null;
+  is_active: boolean;
+  created_at: string;
+  uses: number;
+  discount_given: number;
 }

@@ -80,6 +80,12 @@ export default function Book() {
   const [done, setDone] = useState<Reservation | null>(null);
   const onlinePay = settings.online_payment_enabled && !!settings.payment_qr_path;
   const [payOnline, setPayOnline] = useState(false);
+  const [voucher, setVoucher] = useState('');
+  const [applied, setApplied] = useState<{ code: string; discount: number; total: number; kind: 'percent' | 'amount'; value: number } | null>(null);
+  const [voucherMsg, setVoucherMsg] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  // a different court or time changes the price, so the code must be applied again
+  useEffect(() => { setApplied(null); setVoucherMsg(null); }, [courtId, start, minutes]);
   const usePayOnline = onlinePay && (payOnline || !settings.allow_pay_at_venue);
   // While a booking waits for payment approval, pick up the admin's decision live.
   const doneId = done?.status === 'pending' ? done.id : null;
@@ -238,6 +244,19 @@ export default function Book() {
     navigate('/welcome');
   };
 
+  const applyVoucher = async () => {
+    if (!court || start === null || !voucher.trim()) return;
+    setChecking(true); setVoucherMsg(null);
+    const { data, error: err } = await supabase.rpc('check_voucher', {
+      p_code: voucher, p_court_id: court.id, p_starts_at: new Date(start).toISOString(), p_minutes: minutes,
+    });
+    setChecking(false);
+    if (err) { setApplied(null); setVoucherMsg(toAppError(err).message); return; }
+    const v = data as { code: string; discount: number; total: number; kind: 'percent' | 'amount'; value: number };
+    setApplied({ ...v, discount: Number(v.discount), total: Number(v.total), value: Number(v.value) });
+    setVoucher(v.code);
+  };
+
   const confirm = async () => {
     if (!court || !date || start === null || end === null) return;
     setSubmitting(true);
@@ -249,9 +268,10 @@ export default function Book() {
       const clash = fresh.some((b) => b.court_id === court.id && new Date(b.starts_at).getTime() < end && new Date(b.ends_at).getTime() > start);
       if (clash) throw { code: 'SLOT_TAKEN', message: 'Sorry, that time has just been taken. Please choose another slot.' } satisfies AppError;
       // …and let the database make the final, atomic decision.
-      const { data, error: err } = await supabase.rpc('book_court', {
-        p_court_id: court.id, p_starts_at: new Date(start).toISOString(), p_minutes: minutes, p_pay_online: usePayOnline,
-      });
+      const args = { p_court_id: court.id, p_starts_at: new Date(start).toISOString(), p_minutes: minutes, p_pay_online: usePayOnline };
+      const { data, error: err } = applied
+        ? await supabase.rpc('book_court_with_voucher', { ...args, p_voucher: applied.code })
+        : await supabase.rpc('book_court', args);
       if (err) throw toAppError(err);
       const saved = data as Reservation | null;
       if (!saved?.reference) {
@@ -262,6 +282,7 @@ export default function Book() {
     } catch (e) {
       const err = e && typeof e === 'object' && 'code' in e ? (e as AppError) : toAppError(e);
       setError(err.message);
+      if (err.code === 'VOUCHER_INVALID') { setApplied(null); setVoucherMsg(err.message); }
       if (['SLOT_TAKEN', 'PAST_TIME', 'OUTSIDE_HOURS', 'INVALID_DURATION'].includes(err.code)) {
         setStart(null);
         setStep(4);
@@ -544,7 +565,25 @@ export default function Book() {
             <div><dt>End time</dt><dd>{fmtTime(end)}{endsNextDay && <> <span className="badge">next day</span><br /><span className="small muted">{fmtDateLong(end)}</span></>}</dd></div>
             <div><dt>Duration</dt><dd>{fmtDuration(minutes)}</dd></div>
             {amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(amount, settings.currency)}</dd></div>}
+            {applied && <div className="fact-discount"><dt>Voucher {applied.code}{applied.kind === 'percent' ? ` (${applied.value}% off)` : ''}</dt><dd>− {fmtMoney(applied.discount, settings.currency)}</dd></div>}
+            {applied && <div className="fact-total"><dt>Total to pay</dt><dd>{fmtMoney(applied.total, settings.currency)}</dd></div>}
           </dl>
+          {amount != null && auth.user && auth.profileComplete && (
+            <div className="voucher-box">
+              <label className="field-label" htmlFor="voucher">Voucher code (optional)</label>
+              <div className="voucher-row">
+                <input id="voucher" type="text" value={voucher} maxLength={24} autoCapitalize="characters" autoComplete="off" spellCheck={false}
+                  placeholder="e.g. YPJ-ABC123" disabled={!!applied || checking}
+                  onChange={(e) => { setVoucher(e.target.value.toUpperCase()); setVoucherMsg(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void applyVoucher(); } }} />
+                {applied
+                  ? <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setApplied(null); setVoucher(''); }}>Remove</button>
+                  : <button type="button" className="btn btn-sm btn-outline" onClick={() => void applyVoucher()} disabled={checking || !voucher.trim() || !online}>{checking ? 'Checking…' : 'Apply'}</button>}
+              </div>
+              {applied && <p className="small ok-text"><Icon name="check" size={15} /> Voucher applied. You save {fmtMoney(applied.discount, settings.currency)}.</p>}
+              {voucherMsg && <p className="small warn-text">{voucherMsg}</p>}
+            </div>
+          )}
           {onlinePay ? (
             <fieldset className="pay-choice">
               <legend className="field-label">How will you pay?</legend>
@@ -583,7 +622,7 @@ export default function Book() {
               <div className="btn-row">
                 <button type="button" className="btn btn-ghost" onClick={() => setStep(4)} disabled={submitting}>Change time</button>
                 <button type="button" className="btn btn-primary" onClick={() => void confirm()} disabled={submitting || !online || !selectionOk}>
-                  {submitting ? 'Confirming…' : usePayOnline ? 'Hold court & pay' : 'Confirm booking'}
+                  {submitting ? 'Confirming…' : usePayOnline && !(applied && applied.total <= 0) ? 'Hold court & pay' : 'Confirm booking'}
                 </button>
               </div>
             )}

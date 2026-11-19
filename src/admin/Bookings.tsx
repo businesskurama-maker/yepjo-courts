@@ -178,6 +178,7 @@ export default function Bookings() {
             {detail.customer_phone && <div><dt>Contact no.</dt><dd><a className="link" href={`tel:${detail.customer_phone}`}>{detail.customer_phone}</a></dd></div>}
             {detail.customer_email && <div><dt>Email</dt><dd><a className="link" href={`mailto:${detail.customer_email}`}>{detail.customer_email}</a></dd></div>}
             {detail.amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(Number(detail.amount), settings.currency)}</dd></div>}
+            {Number(detail.discount ?? 0) > 0 && <div><dt>Voucher</dt><dd>{detail.voucher_code} · − {fmtMoney(Number(detail.discount), settings.currency)}</dd></div>}
             {Number(detail.extra_minutes ?? 0) > 0 && <div><dt>Extended by</dt><dd>{fmtDuration(Number(detail.extra_minutes))} · {fmtMoney(Number(detail.extra_amount ?? 0), settings.currency)}{Number(detail.extra_unpaid ?? 0) > 0 ? ` (${fmtMoney(Number(detail.extra_unpaid), settings.currency)} not paid yet)` : ' (paid)'}</dd></div>}
             {detail.extend_request_minutes ? <div><dt>Request</dt><dd>Customer asked for +{fmtDuration(detail.extend_request_minutes)}</dd></div> : null}
             {detail.note && <div><dt>{detail.kind === 'block' ? 'Reason' : 'Note'}</dt><dd>{detail.note}</dd></div>}

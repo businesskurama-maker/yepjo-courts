@@ -157,6 +157,7 @@ export default function MyBookings() {
                 </p>
               )}
               {isUpcoming(r) && r.status === 'pending' && <PaymentPanel booking={r} onChange={replace} />}
+              {Number(r.discount ?? 0) > 0 && r.voucher_code && <p className="tiny ok-text">Voucher {r.voucher_code}: {money(Number(r.discount))} off</p>}
               {Number(r.extra_minutes ?? 0) > 0 && r.status === 'confirmed' && (
                 <p className="small refund-note is-done">Extended by {fmtDuration(Number(r.extra_minutes))}.{Number(r.extra_unpaid ?? 0) > 0 ? ` Please pay ${money(Number(r.extra_unpaid))} for the extra time at the counter.` : ''}</p>
               )}
