@@ -162,15 +162,20 @@ export default function Cafe() {
     void loadOrders();
   };
 
+  if (settings.cafe_visible === false && !auth.isAdmin) {
+    return <div className="page page-narrow"><h1 className="page-title">Yepjo Cafe</h1><Notice>The cafe page is not available right now.</Notice></div>;
+  }
+
   return (
     <div className="page portal cafe-page">
+      {settings.cafe_visible === false && <Notice kind="info">Hidden from customers. Only administrators can see this page. Make it public in Admin → Cafe.</Notice>}
       <header className="cafe-bar card">
         <img src="/photos/cafe/cafe-logo.webp" alt="" className="cafe-logo" width={52} height={52} />
         <div className="cafe-bar-text">
           <h1 className="page-title">Yepjo Cafe</h1>
           <div className="badge-row">
             <span className={`badge ${isOpen ? 'badge-ok' : 'badge-off'}`}><Icon name="clock" size={13} /> {isOpen ? 'Open now' : 'Closed now'} · {opens.slice(0, 5) === closes.slice(0, 5) ? 'open all day' : `${clockLabel(opens)} – ${clockLabel(closes)}`}</span>
-            {settings.rewards_enabled && per > 0 && (
+            {settings.rewards_enabled && (settings.rewards_visible !== false || auth.isAdmin) && per > 0 && (
               <Link to="/rewards" className="badge badge-gift cafe-points"><Icon name="gift" size={13} /> 1 pt per {money(per)}</Link>
             )}
             {!canOrder && items && items.length > 0 && <span className="badge">Order at the counter</span>}

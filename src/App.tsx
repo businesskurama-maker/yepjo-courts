@@ -67,7 +67,8 @@ const NAV = [
   { to: '/account', label: 'Account', icon: 'user' },
 ];
 /** Phone bottom bar: the rest live under More. */
-const PHONE_NAV = ['/', '/book', '/events', '/rewards'];
+/** The first four of these that are visible go on the phone bottom bar. */
+const PHONE_NAV = ['/', '/book', '/events', '/rewards', '/calendar'];
 
 function Shell({ children }: { children: ReactNode }) {
   const { path } = useLocation();
@@ -80,7 +81,10 @@ function Shell({ children }: { children: ReactNode }) {
 
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => setMoreOpen(false), [path]);
-  const links = (className: string, items = NAV, short = false) =>
+  // Pages the admin has hidden are left out of the menu (administrators still see them, to preview).
+  const hiddenPages = auth.isAdmin ? [] : [settings.cafe_visible === false && '/cafe', settings.rewards_visible === false && '/rewards'];
+  const nav = NAV.filter((n) => !hiddenPages.includes(n.to));
+  const links = (className: string, items = nav, short = false) =>
     items.map((n) => (
       <Link key={n.to} to={n.to} className={`${className}${isActive(n.to) ? ' is-active' : ''}`} aria-current={isActive(n.to) ? 'page' : undefined}>
         <span className="nav-icon">
@@ -90,8 +94,9 @@ function Shell({ children }: { children: ReactNode }) {
         <span>{short && n.short ? n.short : n.label}</span>
       </Link>
     ));
-  const phoneMain = NAV.filter((n) => PHONE_NAV.includes(n.to));
-  const phoneMore = NAV.filter((n) => !PHONE_NAV.includes(n.to));
+  const phoneTabs = PHONE_NAV.filter((to) => nav.some((n) => n.to === to)).slice(0, 4);
+  const phoneMain = nav.filter((n) => phoneTabs.includes(n.to));
+  const phoneMore = nav.filter((n) => !phoneTabs.includes(n.to));
   const moreActive = phoneMore.some((n) => isActive(n.to));
 
   return (
@@ -105,7 +110,7 @@ function Shell({ children }: { children: ReactNode }) {
             <small>Pickleball &amp; Badminton Court</small>
           </span>
         </Link>
-        <nav className="topnav" aria-label="Main">{links('topnav-link', NAV, true)}</nav>
+        <nav className="topnav" aria-label="Main">{links('topnav-link', nav, true)}</nav>
         <div className="topbar-end">
           {auth.isAdmin && (
             <Link to="/admin" className={`btn btn-sm ${inAdmin ? 'btn-primary' : 'btn-outline'}`}><Icon name="shield" size={16} /> Admin</Link>

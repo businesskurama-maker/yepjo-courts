@@ -53,6 +53,9 @@ export default function Rewards() {
     if (problem) { setError(problem); setSigningIn(false); }
   };
 
+  if (settings.rewards_visible === false && !auth.isAdmin) {
+    return <div className="page page-narrow"><h1 className="page-title">Rewards</h1><Notice>Yepjo Rewards is not available right now.</Notice></div>;
+  }
   if (settings.rewards_enabled === false) {
     return <div className="page page-narrow"><h1 className="page-title">Rewards</h1><Notice>Yepjo Rewards is paused for now.</Notice></div>;
   }
@@ -69,6 +72,7 @@ export default function Rewards() {
 
   return (
     <div className="page portal rewards">
+      {settings.rewards_visible === false && <Notice kind="info">Hidden from customers. Only administrators can see this page. Make it public in Admin → Rewards.</Notice>}
       <header className="portal-head">
         <div>
           <p className="eyebrow">Loyalty program</p>

@@ -29,6 +29,8 @@ export interface Settings {
   payment_hold_minutes: number;
   carousel_seconds?: number;
   rewards_enabled?: boolean;
+  cafe_visible?: boolean;
+  rewards_visible?: boolean;
   /** Hours of court rental per 1 loyalty point (0 = off). */
   points_court_hours?: number;
   /** Pesos spent per 1 loyalty point (0 = off). */

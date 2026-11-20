@@ -1,3 +1,4 @@
+import { VisibilitySwitch } from './Visibility';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Confirm, Field, Icon, Notice, Toggle, useToast } from '../components/ui';
 import { PhotoPicker } from '../components/PhotoPicker';
@@ -140,6 +141,12 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+      {tab === 'biz' && (
+        <div className="visibility-pair">
+          <VisibilitySwitch field="cafe_visible" />
+          <VisibilitySwitch field="rewards_visible" />
+        </div>
+      )}
       <form className="stack" onSubmit={save} hidden={tab === 'admins'}>
         {error && <Notice kind="error">{error}</Notice>}
 

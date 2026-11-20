@@ -1397,3 +1397,9 @@ h2 { font-size: 1.05rem; letter-spacing: .07em; }
 .voucher-main { display: flex; flex-direction: column; min-width: 0; }
 .voucher-main strong { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
 @media (max-width: 520px) { .voucher-item { grid-template-columns: 1fr auto; } .voucher-code { grid-column: 1 / -1; justify-self: start; } }
+
+/* Public / hidden switch for customer pages */
+.visibility { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 14px; }
+.visibility strong { display: flex; align-items: center; gap: 8px; }
+.visibility.is-hidden { border-color: rgba(255, 176, 32, .45); }
+.visibility-pair { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }

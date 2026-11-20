@@ -5,6 +5,7 @@ import { photoUrl, supabase, toAppError } from '../lib/supabase';
 import type { CafeItem } from '../lib/types';
 import { useSite } from '../state/site';
 import { CafeOrdersAdmin, CafeSettingsCard } from './CafeOrders';
+import { VisibilitySwitch } from './Visibility';
 
 /** Admin: Yepjo Cafe menu (categories, items, prices, photos, availability). */
 export default function CafeAdmin() {
@@ -51,6 +52,7 @@ export default function CafeAdmin() {
   return (
     <div className="stack">
       <h1 className="page-title">Yepjo Cafe</h1>
+      <VisibilitySwitch field="cafe_visible" />
       <CafeSettingsCard unpriced={(rows ?? []).filter((r) => r.price == null).length} />
       <div className="tabs" role="tablist" aria-label="Cafe">
         <button type="button" role="tab" aria-selected={tab === 'orders'} className={`tab${tab === 'orders' ? ' is-active' : ''}`} onClick={() => setTab('orders')}>Orders</button>

@@ -1,3 +1,4 @@
+import { VisibilitySwitch } from './Visibility';
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { PhotoPicker } from '../components/PhotoPicker';
 import { Confirm, Field, Icon, Modal, Notice, Spinner, Toggle, useToast } from '../components/ui';
@@ -50,6 +51,7 @@ export default function RewardsAdmin() {
         </div>
         <Link to="/admin/scan" className="btn btn-primary btn-sm"><Icon name="scan" size={16} /> Scan member QR</Link>
       </div>
+      <VisibilitySwitch field="rewards_visible" />
       <div className="rw-layout">
         <PointRules />
         <section className="card rw-catalog" aria-labelledby="rw-cat">

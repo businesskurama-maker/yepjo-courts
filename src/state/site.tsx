@@ -30,6 +30,8 @@ export const DEFAULT_SETTINGS: Settings = {
   payment_hold_minutes: 30,
   carousel_seconds: 6,
   rewards_enabled: true,
+  cafe_visible: true,
+  rewards_visible: true,
   points_court_hours: 3,
   points_purchase_amount: 200,
   points_dance_booking: 1,
