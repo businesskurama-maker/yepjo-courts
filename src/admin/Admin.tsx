@@ -6,6 +6,7 @@ import { DAY_MS, fmtDateLong, fmtDateTime, fmtRange, toUtcMs, todayYmd } from '.
 import { SPORT_LABEL, type ActivityLog, type Reservation } from '../lib/types';
 import { useAuth } from '../state/auth';
 import { ExtensionsPanel } from './Extend';
+import { PaymentsDuePanel } from './RecordPayment';
 import { useSite } from '../state/site';
 import Bookings from './Bookings';
 import Courts from './Courts';
@@ -240,6 +241,7 @@ function Dashboard({ unread, toCheck }: { unread: number; toCheck: number }) {
         </Link>
       </div>
 
+      <PaymentsDuePanel />
       <ExtensionsPanel />
       <div className="dash-grid">
       <section className="card dash-today" aria-labelledby="today-h">
@@ -280,6 +282,14 @@ function Dashboard({ unread, toCheck }: { unread: number; toCheck: number }) {
 }
 
 // ---------------------------------------------------------------- activity log
+const ACTION_LABEL: Record<string, string> = {
+  'payment.received': 'Payment received at the court',
+  'reservation.extension_paid': 'Extra time paid at the court',
+  'reservation.walk_in': 'Walk-in booking added',
+  'reservation.block': 'Time blocked',
+  'reservation.cancel': 'Booking cancelled',
+  'reservation.extend': 'Booking extended',
+};
 function Logs() {
   const [rows, setRows] = useState<ActivityLog[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -320,7 +330,7 @@ function Logs() {
         {(rows ?? []).map((l) => (
           <li key={l.id} className="row">
             <span className="row-main">
-              <strong>{l.action}</strong>
+              <strong>{ACTION_LABEL[l.action] ?? l.action}</strong>
               <span className="small">{l.details?.label ?? l.entity_id ?? ''}{l.details?.changed?.length ? ` — changed: ${l.details.changed.join(', ')}` : ''}</span>
             </span>
             <span className="row-side small">

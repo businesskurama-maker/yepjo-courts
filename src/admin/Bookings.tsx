@@ -8,7 +8,9 @@ import {
 import { SPORTS, SPORT_LABEL, type Reservation, type ReservationKind, type Sport } from '../lib/types';
 import { useSite } from '../state/site';
 import { ExtendDialog, ExtensionsPanel } from './Extend';
+import { PAID_VIA, PaymentsDuePanel, RecordPaymentDialog, amountDue, paidLine } from './RecordPayment';
 
+const blockHours = (r: Reservation) => (new Date(r.ends_at).getTime() - new Date(r.starts_at).getTime()) / 3_600_000;
 const KIND_LABEL: Record<ReservationKind, string> = { online: 'Online', walk_in: 'Walk-in', block: 'Block' };
 
 export default function Bookings() {
@@ -34,6 +36,8 @@ export default function Bookings() {
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<'walk_in' | 'block' | null>(null);
   const [extending, setExtending] = useState<Reservation | null>(null);
+  const [paying, setPaying] = useState<Reservation | null>(null);
+  const [tick, setTick] = useState(0);
 
   const courtOptions = useMemo(() => courts.filter((c) => !sport || c.sport === sport), [courts, sport]);
   const courtName = (id: number) => {
@@ -60,6 +64,7 @@ export default function Bookings() {
       setRows((data as Reservation[]) ?? []);
       setTotal(count ?? 0);
       setError(null);
+      setTick((n) => n + 1);
     }
   }, [date, sport, courtId, status, kind, page, pageSize, courts]);
 
@@ -128,6 +133,7 @@ export default function Bookings() {
         {date && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDate(''); resetPage(); }}>All dates</button>}
       </div>
 
+      <PaymentsDuePanel refresh={tick} onPaid={() => void load()} />
       <ExtensionsPanel />
       {error && <Notice kind="error" action={<button type="button" className="btn btn-sm" onClick={() => void load()}>Retry</button>}>{error}</Notice>}
       {rows === null && !error && <Spinner />}
@@ -148,7 +154,10 @@ export default function Bookings() {
                     <span className={`badge ${r.kind === 'block' ? 'badge-off' : ''}`}>{KIND_LABEL[r.kind]}</span>
                     {r.status === 'cancelled' && <span className="badge badge-off">Cancelled</span>}
                     {r.extend_request_minutes ? <span className="badge badge-warn">Wants +{fmtDuration(r.extend_request_minutes)}</span> : null}
-                    {Number(r.extra_unpaid ?? 0) > 0 && <span className="badge badge-warn">Extension unpaid</span>}
+                    {amountDue(r) > 0
+                      ? <span className="badge badge-warn">To collect {fmtMoney(amountDue(r), settings.currency)}</span>
+                      : Number(r.extra_unpaid ?? 0) > 0 && <span className="badge badge-warn">Extension unpaid</span>}
+                    {r.status === 'confirmed' && r.payment_status === 'verified' && <span className="badge badge-ok">Paid</span>}
                   </span>
                 </span>
                 <Icon name="right" size={16} />
@@ -159,13 +168,19 @@ export default function Bookings() {
       )}
       <Pager page={page} pageSize={pageSize} total={total} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1); }} />
 
+      {paying && <RecordPaymentDialog booking={paying} onClose={() => setPaying(null)} onDone={() => { setPaying(null); void load(); }} />}
       {extending && <ExtendDialog booking={extending} onClose={() => setExtending(null)} onDone={() => { setExtending(null); void load(); }} />}
       {detail && (
         <Modal title={`${KIND_LABEL[detail.kind]} · ${detail.reference}`} onClose={() => setDetail(null)} footer={
           detail.status === 'confirmed'
             ? <>
                 <button type="button" className="btn btn-outline-danger" onClick={() => setCancelling(detail)}>{detail.kind === 'block' ? 'Remove block' : 'Cancel reservation'}</button>
-                {detail.kind !== 'block' && <button type="button" className="btn btn-primary" onClick={() => { setExtending(detail); setDetail(null); }}><Icon name="clock" size={16} /> Extend time</button>}
+                {detail.kind !== 'block' && <button type="button" className={`btn ${amountDue(detail) > 0 ? 'btn-outline' : 'btn-primary'}`} onClick={() => { setExtending(detail); setDetail(null); }}><Icon name="clock" size={16} /> Extend time</button>}
+                {(amountDue(detail) > 0 || (detail.kind === 'block' && blockHours(detail) <= 24)) && (
+                  <button type="button" className="btn btn-primary" onClick={() => { setPaying(detail); setDetail(null); }}>
+                    <Icon name="check" size={16} /> {detail.kind === 'block' ? 'Customer paid' : 'Record payment'}
+                  </button>
+                )}
               </>
             : undefined
         }>
@@ -178,6 +193,9 @@ export default function Bookings() {
             {detail.customer_phone && <div><dt>Contact no.</dt><dd><a className="link" href={`tel:${detail.customer_phone}`}>{detail.customer_phone}</a></dd></div>}
             {detail.customer_email && <div><dt>Email</dt><dd><a className="link" href={`mailto:${detail.customer_email}`}>{detail.customer_email}</a></dd></div>}
             {detail.amount != null && <div><dt>Court fee</dt><dd>{fmtMoney(Number(detail.amount), settings.currency)}</dd></div>}
+            {detail.kind !== 'block' && detail.status === 'confirmed' && Number(detail.amount ?? 0) > 0 && (
+              <div><dt>Payment</dt><dd>{paidLine(detail, settings.currency) ?? <span className="warn-text">Not paid yet · {fmtMoney(amountDue(detail), settings.currency)} to collect at the court</span>}{detail.paid_note ? ` · ${detail.paid_note}` : ''}</dd></div>
+            )}
             {Number(detail.discount ?? 0) > 0 && <div><dt>Voucher</dt><dd>{detail.voucher_code} · − {fmtMoney(Number(detail.discount), settings.currency)}</dd></div>}
             {Number(detail.extra_minutes ?? 0) > 0 && <div><dt>Extended by</dt><dd>{fmtDuration(Number(detail.extra_minutes))} · {fmtMoney(Number(detail.extra_amount ?? 0), settings.currency)}{Number(detail.extra_unpaid ?? 0) > 0 ? ` (${fmtMoney(Number(detail.extra_unpaid), settings.currency)} not paid yet)` : ' (paid)'}</dd></div>}
             {detail.extend_request_minutes ? <div><dt>Request</dt><dd>Customer asked for +{fmtDuration(detail.extend_request_minutes)}</dd></div> : null}
@@ -194,7 +212,7 @@ export default function Bookings() {
           <p>{courtName(cancelling.court_id)}<br />{fmtDateLong(cancelling.starts_at)} · {fmtRange(cancelling.starts_at, cancelling.ends_at)}</p>
           {cancelling.payment_status === 'verified' && Number(cancelling.amount ?? 0) > 0 && (
             <fieldset className="pay-choice">
-              <legend className="field-label">Paid online: {fmtMoney(Number(cancelling.amount), settings.currency)}</legend>
+              <legend className="field-label">{cancelling.paid_via ? 'Paid at the court' : 'Paid online'}: {fmtMoney(Number(cancelling.amount), settings.currency)}</legend>
               <label className={`pay-option${!fullRefund ? ' is-active' : ''}`}>
                 <input type="radio" name="refund" checked={!fullRefund} onChange={() => setFullRefund(false)} />
                 <span><strong>Customer cancelled: keep {settings.cancel_fee_percent ?? 50}% fee</strong><small>Refund {fmtMoney(Number(cancelling.amount) * (100 - (settings.cancel_fee_percent ?? 50)) / 100, settings.currency)} at the counter.</small></span>
@@ -230,6 +248,7 @@ function CreateDialog({ kind, defaultDate, onClose, onSaved }: { kind: 'walk_in'
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
+  const [paidVia, setPaidVia] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -245,14 +264,16 @@ function CreateDialog({ kind, defaultDate, onClose, onSaved }: { kind: 'walk_in'
     const en = fromLocalInput(endAt);
     if (en <= s) return setError('The end must be after the start.');
     if (kind === 'walk_in' && !name.trim()) return setError("Enter the customer's name.");
+    if (kind === 'walk_in' && !paidVia) return setError('Choose whether the customer has paid.');
     setBusy(true);
     const { error: err } = await supabase.rpc('admin_create_reservations', {
       p_court_ids: selected, p_starts_at: new Date(s).toISOString(), p_ends_at: new Date(en).toISOString(), p_kind: kind,
       p_customer_name: name || null, p_customer_phone: phone || null, p_note: note || null,
+      ...(kind === 'walk_in' && paidVia !== 'later' ? { p_paid_via: paidVia } : {}),
     });
     setBusy(false);
     if (err) return setError(toAppError(err).message);
-    toast(kind === 'walk_in' ? 'Walk-in booking saved.' : `Blocked ${selected.length} court${selected.length > 1 ? 's' : ''}.`);
+    toast(kind === 'walk_in' ? (paidVia === 'later' ? 'Walk-in saved. Payment is on the to-collect list.' : 'Walk-in saved and payment recorded.') : `Blocked ${selected.length} court${selected.length > 1 ? 's' : ''}.`);
     onSaved();
   };
 
@@ -291,13 +312,22 @@ function CreateDialog({ kind, defaultDate, onClose, onSaved }: { kind: 'walk_in'
             <Field label="Contact number (optional)"><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} /></Field>
           </div>
         )}
+        {kind === 'walk_in' && (
+          <Field label="Payment">
+            <select value={paidVia} onChange={(e) => setPaidVia(e.target.value)} required>
+              <option value="">Choose…</option>
+              {PAID_VIA.map(([k, label]) => <option key={k} value={k}>Paid now · {label}</option>)}
+              <option value="later">Not paid yet (collect later)</option>
+            </select>
+          </Field>
+        )}
         <Field label={kind === 'walk_in' ? 'Note (optional)' : 'Reason (maintenance, event, closure…)'}>
           <input type="text" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
         </Field>
         <p className="muted small">
           {kind === 'walk_in'
             ? 'Uses the same conflict check as online bookings: it is refused if the court is already taken.'
-            : 'A block is refused if any selected court already has a booking in that period; cancel those bookings first. Nothing is saved unless every court can be blocked.'}
+            : 'A block only closes the time: it has no customer or price and is not counted as sales. For a customer who will pay, use Walk-in instead (or open the block later and tap "Customer paid"). A block is refused if any selected court already has a booking in that period; cancel those bookings first. Nothing is saved unless every court can be blocked.'}
         </p>
         <button type="submit" className="btn btn-primary btn-block" disabled={busy}>{busy ? 'Saving…' : kind === 'walk_in' ? 'Save walk-in' : 'Block time'}</button>
       </form>

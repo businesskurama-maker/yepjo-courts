@@ -10,6 +10,7 @@ interface Totals {
   online_revenue: number; venue_revenue: number; walk_in_revenue: number; walk_ins: number;
   cancelled: number; cancelled_value: number; pending: number; pending_value: number;
   open_hours: number; prev_revenue: number; prev_bookings: number;
+  collected?: number; to_collect?: number; to_collect_count?: number;
 }
 interface Day { date: string; revenue: number; bookings: number; hours: number }
 interface CourtRow { court: string; sport: Sport; revenue: number; bookings: number; hours: number }
@@ -18,6 +19,7 @@ interface Row {
   date: string; reference: string; court: string; sport: Sport; starts_at: string; ends_at: string; hours: number;
   customer: string | null; phone: string | null; kind: string; payment: string; payment_ref: string | null;
   status: string; amount: number | null;
+  due?: number; paid_via?: string | null; received_by?: string | null; received_at?: string | null;
 }
 interface Report {
   month: string; from: string; to: string; totals: Totals; daily: Day[]; courts: CourtRow[];
@@ -39,6 +41,8 @@ const hourLabel = (h: number) => `${((h + 11) % 12) + 1} ${h < 12 ? 'AM' : 'PM'}
 const timeLabel = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
 const PAYMENT_LABEL: Record<string, string> = { online: 'Paid online (QR)', venue: 'Pay at venue', walk_in: 'Walk-in' };
+const VIA_LABEL: Record<string, string> = { cash: 'Cash', gcash: 'GCash', maya: 'Maya', bank: 'Bank transfer', other: 'Other' };
+const paidLabel = (r: Row) => r.status !== 'confirmed' ? '' : n(r.due) > 0 ? 'Not paid yet' : r.paid_via ? `Paid at court (${VIA_LABEL[r.paid_via] ?? 'Other'})` : r.payment === 'online' ? 'Paid online' : n(r.amount) > 0 ? 'Paid' : '';
 const STATUS_LABEL: Record<string, string> = { confirmed: 'Confirmed', cancelled: 'Cancelled', pending: 'Payment to check' };
 
 function csvCell(v: unknown) {
@@ -88,13 +92,14 @@ export default function Reports() {
 
   const exportCsv = () => {
     if (!data) return;
-    const head = ['Business date', 'Reference', 'Sport', 'Court', 'Start', 'End', 'Hours', 'Customer', 'Phone', 'Payment', 'Payment ref (last 6)', 'Status', `Amount (${settings.currency})`];
+    const head = ['Business date', 'Reference', 'Sport', 'Court', 'Start', 'End', 'Hours', 'Customer', 'Phone', 'Payment', 'Payment ref (last 6)', 'Status', `Amount (${settings.currency})`, 'Paid', `Still to collect (${settings.currency})`, 'Received by', 'Received on'];
     const lines = data.rows.map((r) => [
       r.date, r.reference, SPORT_LABEL[r.sport], r.court, timeLabel(r.starts_at), timeLabel(r.ends_at), r.hours,
       r.customer, r.phone, PAYMENT_LABEL[r.payment] ?? r.payment, r.payment_ref, STATUS_LABEL[r.status] ?? r.status,
-      r.amount == null ? '' : n(r.amount).toFixed(2),
+      r.amount == null ? '' : n(r.amount).toFixed(2), paidLabel(r), r.status === 'confirmed' && n(r.due) > 0 ? n(r.due).toFixed(2) : '',
+      r.received_by, r.received_at ? new Date(r.received_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '',
     ].map(csvCell).join(','));
-    const total = ['', '', '', '', '', '', '', '', '', '', '', 'Total sales (confirmed)', n(data.totals.revenue).toFixed(2)].map(csvCell).join(',');
+    const total = ['', '', '', '', '', '', '', '', '', '', '', 'Total sales (confirmed)', n(data.totals.revenue).toFixed(2), '', n(data.totals.to_collect).toFixed(2)].map(csvCell).join(',');
     const blob = new Blob(['﻿' + [head.join(','), ...lines, total].join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -205,6 +210,12 @@ export default function Reports() {
                   </div>
                 ))}
                 <div className="report-notes">
+                  {t.collected != null && n(t.revenue) > 0 && (
+                    <span className="badge badge-ok">Collected {money(n(t.collected))}</span>
+                  )}
+                  {n(t.to_collect) > 0 && (
+                    <span className="badge badge-warn">{n(t.to_collect_count)} not paid yet · {money(n(t.to_collect))} to collect at the court</span>
+                  )}
                   {n(t.pending) > 0 && (
                     <span className="badge badge-warn">{n(t.pending)} payment{n(t.pending) === 1 ? '' : 's'} to check · {money(n(t.pending_value))} not counted yet</span>
                   )}
@@ -279,7 +290,7 @@ export default function Reports() {
 
               <p className="tiny muted">
                 Sales count confirmed bookings and walk-ins by the night they were played (after-midnight hours belong to the evening before).
-                Pay-at-venue bookings are counted as expected sales. Download the CSV for every booking line, including cancellations.
+                Bookings to be paid at the court are counted as expected sales until staff record the payment; the “to collect” figure shows what is still unpaid. Download the CSV for every booking line, including cancellations.
               </p>
             </>
           )}

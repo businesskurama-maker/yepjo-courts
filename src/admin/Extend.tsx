@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Confirm, Icon, Modal, Notice, useToast } from '../components/ui';
 import { supabase, toAppError } from '../lib/supabase';
-import { fmtDateShort, fmtDuration, fmtMoney, fmtRange, fmtTime } from '../lib/time';
+import { DAY_MS, fmtDateShort, fmtDuration, fmtMoney, fmtRange, fmtTime } from '../lib/time';
 import { SPORT_LABEL, type Reservation } from '../lib/types';
 import { useSite } from '../state/site';
+import { amountDue, notifyPayments, usePaymentsChanged } from './RecordPayment';
 
 /** Staff dialog: add hours to a booking, with the extra time paid or not paid yet. */
 export function ExtendDialog({ booking, onClose, onDone }: { booking: Reservation; onClose: () => void; onDone: (r: Reservation) => void }) {
@@ -22,6 +23,7 @@ export function ExtendDialog({ booking, onClose, onDone }: { booking: Reservatio
     setBusy(false);
     if (err) return setError(toAppError(err).message);
     const r = data as Reservation;
+    notifyPayments();
     toast(`${r.reference} extended to ${fmtTime(r.ends_at)}${paid ? '' : `. ${fmtMoney(Number(r.extra_unpaid ?? 0), settings.currency)} still to collect`}.`);
     onDone(r);
   };
@@ -84,9 +86,11 @@ export function ExtensionsPanel() {
       supabase.from('reservations').select('*').gt('extra_unpaid', 0).neq('status', 'cancelled').order('starts_at'),
     ]);
     setReqs(((a.data as Reservation[]) ?? []).filter((r) => new Date(r.ends_at).getTime() > Date.now() - 3_600_000));
-    setOwed((b.data as Reservation[]) ?? []);
+    // unpaid bookings are on the "to collect at the court" list, extra time included
+    setOwed(((b.data as Reservation[]) ?? []).filter((r) => amountDue(r) === 0 || new Date(r.starts_at).getTime() >= Date.now() + DAY_MS));
   }, []);
   useEffect(() => { void load(); }, [load, pulse]);
+  usePaymentsChanged(load);
 
   const run = async (fn: string, r: Reservation, ok: string) => {
     setBusy(true);
@@ -98,6 +102,7 @@ export function ExtensionsPanel() {
 
   if (reqs.length === 0 && owed.length === 0) return null;
   return (
+    <>
     <section className="card stack-sm refunds" aria-labelledby="ext-h">
       {reqs.length > 0 && (<>
         <h2 id="ext-h"><Icon name="clock" size={18} /> Extension requests ({reqs.length})</h2>
@@ -134,6 +139,7 @@ export function ExtensionsPanel() {
           ))}
         </ul>
       </>)}
+    </section>
       {extending && <ExtendDialog booking={extending} onClose={() => setExtending(null)} onDone={() => { setExtending(null); void load(); }} />}
       {declining && (
         <Confirm title="Decline this request?" confirmLabel="Decline" danger busy={busy}
@@ -147,6 +153,6 @@ export function ExtensionsPanel() {
           <p>Payment for the extra time on {paying.reference} ({paying.customer_name ?? 'customer'}).</p>
         </Confirm>
       )}
-    </section>
+    </>
   );
 }

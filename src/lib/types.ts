@@ -97,6 +97,7 @@ export type PaymentStatus = 'not_required' | 'unpaid' | 'submitted' | 'verified'
 export const awaitingPayment = (r: Pick<Reservation, 'status' | 'payment_status'>) =>
   r.status === 'pending' && (r.payment_status === 'unpaid' || r.payment_status === 'rejected');
 
+export type PaidVia = 'cash' | 'gcash' | 'maya' | 'bank' | 'other';
 export type ReservationKind = 'online' | 'walk_in' | 'block';
 
 export interface Reservation {
@@ -122,6 +123,10 @@ export interface Reservation {
   payment_submitted_at?: string | null;
   payment_verified_at?: string | null;
   payment_note?: string | null;
+  paid_via?: PaidVia | null;
+  paid_amount?: number | null;
+  paid_by_name?: string | null;
+  paid_note?: string | null;
   hold_expires_at?: string | null;
   cancel_fee?: number | null;
   refund_amount?: number | null;
