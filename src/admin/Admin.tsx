@@ -288,6 +288,7 @@ const ACTION_LABEL: Record<string, string> = {
   'reservation.walk_in': 'Walk-in booking added',
   'reservation.block': 'Time blocked',
   'reservation.cancel': 'Booking cancelled',
+  'reservation.delete': 'Booking deleted by staff',
   'reservation.extend': 'Booking extended',
 };
 function Logs() {

@@ -21,7 +21,7 @@ export default function Bookings() {
   const [date, setDate] = useState(query.get('date') ?? todayYmd());
   const [sport, setSport] = useState<Sport | ''>('');
   const [courtId, setCourtId] = useState<number | ''>('');
-  const [status, setStatus] = useState<'' | 'confirmed' | 'cancelled'>('confirmed');
+  const [status, setStatus] = useState<'' | 'active' | 'done' | 'cancelled'>('active');
   const [kind, setKind] = useState<ReservationKind | ''>((query.get('kind') as ReservationKind | null) ?? '');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -38,6 +38,8 @@ export default function Bookings() {
   const [extending, setExtending] = useState<Reservation | null>(null);
   const [paying, setPaying] = useState<Reservation | null>(null);
   const [tick, setTick] = useState(0);
+  const [deleting, setDeleting] = useState<Reservation | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const courtOptions = useMemo(() => courts.filter((c) => !sport || c.sport === sport), [courts, sport]);
   const courtName = (id: number) => {
@@ -53,7 +55,11 @@ export default function Bookings() {
     }
     if (courtId !== '') q = q.eq('court_id', courtId);
     else if (sport) q = q.in('court_id', courts.filter((c) => c.sport === sport).map((c) => c.id));
-    if (status) q = q.eq('status', status);
+    // Active = not finished yet. A booking leaves this list by itself once its time is over.
+    const nowIso = new Date().toISOString();
+    if (status === 'active') q = q.eq('status', 'confirmed').gt('ends_at', nowIso);
+    else if (status === 'done') q = q.eq('status', 'confirmed').lte('ends_at', nowIso);
+    else if (status) q = q.eq('status', status);
     if (kind) q = q.eq('kind', kind);
     const { data, error: err, count } = await q
       .order('starts_at', { ascending: Boolean(date) })
@@ -71,6 +77,27 @@ export default function Bookings() {
   useEffect(() => {
     void load();
   }, [load, pulse]);
+  // finished bookings drop off the active list without a page refresh
+  useEffect(() => {
+    const t = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(t);
+  }, [load]);
+
+  const isActive = (r: Reservation) => r.status === 'confirmed' && new Date(r.ends_at).getTime() > Date.now();
+  const remove = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    const { error: err } = await supabase.rpc('admin_delete_reservation', { p_id: deleting.id, p_reason: deleteReason || null });
+    setBusy(false);
+    if (err) toast(toAppError(err).message, 'error');
+    else {
+      toast(`${deleting.reference} was deleted. The time is open again and the deletion is in the activity log.`);
+      setDeleting(null);
+      setDetail(null);
+      setDeleteReason('');
+    }
+    void load();
+  };
 
   const resetPage = () => setPage(1);
 
@@ -117,9 +144,10 @@ export default function Bookings() {
         </label>
         <label className="field"><span className="field-label">Status</span>
           <select value={status} onChange={(e) => { setStatus(e.target.value as typeof status); resetPage(); }}>
-            <option value="">Any status</option>
-            <option value="confirmed">Confirmed</option>
+            <option value="active">Active</option>
+            <option value="done">Done</option>
             <option value="cancelled">Cancelled</option>
+            <option value="">Any status</option>
           </select>
         </label>
         <label className="field"><span className="field-label">Type</span>
@@ -137,7 +165,7 @@ export default function Bookings() {
       <ExtensionsPanel />
       {error && <Notice kind="error" action={<button type="button" className="btn btn-sm" onClick={() => void load()}>Retry</button>}>{error}</Notice>}
       {rows === null && !error && <Spinner />}
-      {rows !== null && rows.length === 0 && <Empty icon="ticket" title="No reservations match these filters" />}
+      {rows !== null && rows.length === 0 && <Empty icon="ticket" title={status === 'active' ? 'No active bookings' : 'No reservations match these filters'}>{status === 'active' ? 'Finished bookings move to Done by themselves.' : null}</Empty>}
 
       {rows !== null && rows.length > 0 && (
         <ul className="rows card">
@@ -162,6 +190,11 @@ export default function Bookings() {
                 </span>
                 <Icon name="right" size={16} />
               </button>
+              {isActive(r) && (
+                <button type="button" className="btn btn-sm btn-outline-danger row-del" onClick={() => setDeleting(r)} aria-label={`Delete ${r.reference}`} title="Delete this booking">
+                  <Icon name="trash" size={16} />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -174,6 +207,7 @@ export default function Bookings() {
         <Modal title={`${KIND_LABEL[detail.kind]} · ${detail.reference}`} onClose={() => setDetail(null)} footer={
           detail.status === 'confirmed'
             ? <>
+                {isActive(detail) && <button type="button" className="btn btn-outline-danger" onClick={() => setDeleting(detail)}><Icon name="trash" size={16} /> Delete</button>}
                 <button type="button" className="btn btn-outline-danger" onClick={() => setCancelling(detail)}>{detail.kind === 'block' ? 'Remove block' : 'Cancel reservation'}</button>
                 {detail.kind !== 'block' && <button type="button" className={`btn ${amountDue(detail) > 0 ? 'btn-outline' : 'btn-primary'}`} onClick={() => { setExtending(detail); setDetail(null); }}><Icon name="clock" size={16} /> Extend time</button>}
                 {(amountDue(detail) > 0 || (detail.kind === 'block' && blockHours(detail) <= 24)) && (
@@ -204,6 +238,20 @@ export default function Bookings() {
             <div><dt>Created</dt><dd>{fmtDateTime(detail.created_at)}</dd></div>
           </dl>
         </Modal>
+      )}
+
+      {deleting && (
+        <Confirm title="Delete this booking?" danger busy={busy} confirmLabel="Delete booking" onConfirm={() => void remove()} onClose={() => { setDeleting(null); setDeleteReason(''); }}>
+          <p><strong>{deleting.kind === 'block' ? deleting.note ?? 'Blocked time' : deleting.customer_name ?? 'Customer'}</strong> · {deleting.reference}<br />
+            {courtName(deleting.court_id)}<br />{fmtDateLong(deleting.starts_at)} · {fmtRange(deleting.starts_at, deleting.ends_at)}</p>
+          {deleting.payment_status === 'verified' && Number(deleting.amount ?? 0) > 0 && (
+            <Notice kind="warn">This booking is paid ({fmtMoney(Number(deleting.amount), settings.currency)}). Deleting removes it from the sales report and records no refund. To keep a record with the fee and refund, use Cancel reservation instead.</Notice>
+          )}
+          <Field label="Reason (optional, saved in the activity log)">
+            <input type="text" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} maxLength={200} />
+          </Field>
+          <p className="tiny muted">The booking is removed for good and the time opens again. The activity log keeps who deleted it and the booking details.</p>
+        </Confirm>
       )}
 
       {cancelling && (

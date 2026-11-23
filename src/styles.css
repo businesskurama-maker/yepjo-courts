@@ -1403,3 +1403,6 @@ h2 { font-size: 1.05rem; letter-spacing: .07em; }
 .visibility strong { display: flex; align-items: center; gap: 8px; }
 .visibility.is-hidden { border-color: rgba(255, 176, 32, .45); }
 .visibility-pair { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+
+/* One-tap delete on active booking rows */
+.row-del { flex: none; min-width: 40px; min-height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
