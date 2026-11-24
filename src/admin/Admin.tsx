@@ -1,3 +1,4 @@
+import { purgeOldReceipts } from '../lib/receipt';
 import { useCallback, useEffect, useState } from 'react';
 import { Empty, GoogleButton, Icon, Notice, Pager, Spinner } from '../components/ui';
 import { Link, useLocation } from '../lib/router';
@@ -107,6 +108,8 @@ function useCafeToDo(): number {
 export default function Admin() {
   const auth = useAuth();
   const { path } = useLocation();
+  // payment screenshots are kept 30 days; clear the expired ones quietly
+  useEffect(() => { if (auth.isAdmin) void purgeOldReceipts(); }, [auth.isAdmin]);
 
   if (!auth.ready) return <div className="page"><Spinner /></div>;
   if (!auth.user) {
@@ -289,6 +292,9 @@ const ACTION_LABEL: Record<string, string> = {
   'reservation.block': 'Time blocked',
   'reservation.cancel': 'Booking cancelled',
   'reservation.delete': 'Booking deleted by staff',
+  'receipts.purge': 'Old payment screenshots removed',
+  'payment.verify': 'Online payment approved',
+  'payment.reject': 'Online payment rejected',
   'reservation.extend': 'Booking extended',
 };
 function Logs() {

@@ -44,6 +44,8 @@ create function t.slot(p_days int, p_time time) returns text language sql as $$
 $$;
 
 
+-- these older checks still use the typed-reference functions, which customers can no longer call
+grant execute on function public.submit_payment(uuid, text), public.submit_registration_payment(uuid, text), public.submit_order_payment(uuid, text) to authenticated;
 do $$
 declare
   a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); adm uuid := gen_random_uuid();

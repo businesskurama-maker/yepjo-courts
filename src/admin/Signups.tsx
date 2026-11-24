@@ -1,3 +1,4 @@
+import { ReceiptThumb } from '../components/Receipt';
 import { useCallback, useEffect, useState } from 'react';
 import { Confirm, Modal, Notice, Spinner, useToast } from '../components/ui';
 import { supabase, toAppError } from '../lib/supabase';
@@ -83,6 +84,7 @@ export function SignupsDialog({ kind, targetId, title, capacity, onClose }: {
                 </span>
               </span>
               <span className="row-actions">
+                <ReceiptThumb path={r.payment_proof_path} label={`Receipt · ${r.customer_name ?? r.reference}`} size="sm" />
                 {r.status === 'pending' && r.payment_status === 'submitted' && (
                   <>
                     <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void review(r, true)}>Approve</button>

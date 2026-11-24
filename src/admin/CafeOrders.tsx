@@ -1,3 +1,4 @@
+import { ReceiptThumb } from '../components/Receipt';
 import { useCallback, useEffect, useState } from 'react';
 import { Confirm, Empty, Field, Icon, Modal, Notice, Toggle, useToast } from '../components/ui';
 import { supabase, toAppError } from '../lib/supabase';
@@ -85,7 +86,9 @@ export function CafeOrdersAdmin() {
               {o.note && <p className="small kitchen-note">“{o.note}”</p>}
               <p className="small muted">{o.customer_name}{o.customer_phone ? <> · <a className="link" href={`tel:${o.customer_phone}`}>{o.customer_phone}</a></> : null} · <b className="ok-text">{money(Number(o.total))}</b></p>
               {o.status === 'pending' && o.payment_status === 'submitted' && (
-                <p className="small">Reference ends <b>{o.payment_ref}</b>. Check it in GCash/Maya before approving.</p>
+                o.payment_proof_path
+                  ? <div className="receipt-line"><ReceiptThumb path={o.payment_proof_path} label={`Receipt · ${o.reference}`} size="sm" /><span className="small">Open the screenshot and check it in GCash/Maya before approving.</span></div>
+                  : <p className="small">Reference ends <b>{o.payment_ref}</b>. Check it in GCash/Maya before approving.</p>
               )}
               {o.status === 'cancelled' && o.refund_status === 'to_claim' && <p className="refund-note small">Refund {money(Number(o.refund_amount ?? 0))} to hand over (see Payments).</p>}
               <div className="btn-row">

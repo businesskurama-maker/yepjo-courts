@@ -31,7 +31,7 @@ export function paidLine(r: Reservation, currency: string) {
   if (r.paid_via) {
     return `${fmtMoney(Number(r.paid_amount ?? r.amount ?? 0), currency)} · ${viaLabel(r.paid_via)} at the court${r.paid_by_name ? ` · received by ${r.paid_by_name}` : ''}${r.payment_verified_at ? ` · ${fmtDateTime(r.payment_verified_at)}` : ''}`;
   }
-  return `Paid online (QR)${r.payment_ref ? ` · ref ${r.payment_ref}` : ''}`;
+  return `Paid online (QR)${r.payment_ref ? ` · ref ${r.payment_ref}` : r.payment_proof_path ? ' · receipt screenshot on file' : ''}`;
 }
 
 /** Staff dialog: the customer paid at the court. A block made for a customer becomes a walk-in booking. */

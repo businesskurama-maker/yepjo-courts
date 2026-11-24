@@ -47,6 +47,8 @@ create function t.next_dow(p_dow int) returns int language sql as $$
   select min(d) from generate_series(2, 9) d where extract(dow from (now() at time zone 'Asia/Manila')::date + d) = p_dow
 $$;
 
+-- these older checks still use the typed-reference functions, which customers can no longer call
+grant execute on function public.submit_payment(uuid, text), public.submit_registration_payment(uuid, text), public.submit_order_payment(uuid, text) to authenticated;
 do $$
 declare
   a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); adm uuid := gen_random_uuid();

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Empty, Icon, Modal, Notice, Pager, Spinner, useToast } from '../components/ui';
 import { useCountdown } from '../components/Payment';
+import { ReceiptThumb } from '../components/Receipt';
 import { Link } from '../lib/router';
 import { supabase, toAppError } from '../lib/supabase';
 import { fmtDateLong, fmtDateTime, fmtMoney, fmtRange } from '../lib/time';
@@ -17,7 +18,7 @@ function HoldLeft({ until }: { until: string | null | undefined }) {
   return <span className={`badge ${c.left === 0 ? 'badge-off' : 'badge-warn'}`}>{c.left === 0 ? 'Hold expired' : `${c.label} left`}</span>;
 }
 
-/** Online QR payments: verify the reference against the GCash/bank app, then approve or reject. */
+/** Online QR payments: open the customer's receipt screenshot, check it against the GCash/bank app, then approve or reject. */
 export default function Payments() {
   const { courts, settings, pulse } = useSite();
   const toast = useToast();
@@ -50,7 +51,7 @@ export default function Payments() {
     const { error: err } = await supabase.rpc('admin_review_payment', { p_id: r.id, p_approve: approve, p_note: why ?? null });
     setBusyId(null);
     if (err) return toast(toAppError(err).message, 'error');
-    toast(approve ? `Payment approved. ${r.reference} is confirmed.` : `Payment rejected. ${r.customer_name ?? 'The customer'} can send a corrected reference.`);
+    toast(approve ? `Payment approved. ${r.reference} is confirmed.` : `Payment rejected. ${r.customer_name ?? 'The customer'} can send a new receipt screenshot.`);
     setRejecting(null);
     setNote('');
     void load();
@@ -82,7 +83,7 @@ export default function Payments() {
       {rows === null && !error && <Spinner />}
       {rows !== null && list.length === 0 && (
         <Empty icon="check" title={tab === 'check' ? 'Nothing to check' : tab === 'waiting' ? 'No unpaid holds' : 'No approved payments yet'}>
-          {tab === 'check' && 'New payment references appear here as soon as customers send them.'}
+          {tab === 'check' && 'New receipt screenshots appear here as soon as customers send them.'}
         </Empty>
       )}
       <ul className="booking-list">
@@ -94,10 +95,16 @@ export default function Payments() {
               {r.payment_status === 'verified' && <span className="badge badge-ok">Approved</span>}
             </div>
             <div className="pay-ref-row">
-              <div>
-                <span className="tiny muted">Reference (last 6)</span>
-                <span className="pay-ref">{r.payment_ref ?? '— not sent —'}</span>
-              </div>
+              {r.payment_proof_path
+                ? <ReceiptThumb path={r.payment_proof_path} label={`Receipt · ${r.customer_name ?? r.reference}`} />
+                : (
+                  <div>
+                    <span className="tiny muted">{r.payment_ref ? 'Reference (last 6)' : 'Receipt'}</span>
+                    <span className={r.payment_ref ? 'pay-ref' : 'pay-noref small muted'}>
+                      {r.payment_ref ?? (r.payment_status === 'verified' ? 'No screenshot kept' : 'Not sent yet')}
+                    </span>
+                  </div>
+                )}
               <div>
                 <span className="tiny muted">Amount</span>
                 <span className="pay-amt">{r.amount != null ? fmtMoney(Number(r.amount), settings.currency) : 'Rate not set'}</span>
@@ -124,6 +131,7 @@ export default function Payments() {
           </li>
         ))}
       </ul>
+      {tab === 'verified' && list.length > 0 && <p className="tiny muted">Receipt screenshots are kept for 30 days after approval, then removed automatically. The booking and the sale stay on record.</p>}
       <Pager page={page} pageSize={PAGE_SIZE} total={list.length} onPage={setPage} />
 
       {rejecting && (
@@ -132,11 +140,11 @@ export default function Payments() {
             <button type="button" className="btn btn-ghost" onClick={() => setRejecting(null)}>Back</button>
             <button type="button" className="btn btn-danger" disabled={busyId === rejecting.id} onClick={() => void review(rejecting, false, note)}>Reject payment</button>
           </>}>
-          <p className="small">{rejecting.customer_name} · reference <strong>{rejecting.payment_ref ?? 'not sent'}</strong></p>
-          <p className="small muted">The court stays held for another {settings.payment_hold_minutes} minutes so they can send a corrected reference. To release the court now, cancel the booking in Bookings instead.</p>
+          <p className="small">{rejecting.customer_name} · {rejecting.reference}</p>
+          <p className="small muted">The court stays held for another {settings.payment_hold_minutes} minutes so they can send a new screenshot. To release the court now, cancel the booking in Bookings instead.</p>
           <label className="field">
             <span className="field-label">Message to the customer (optional)</span>
-            <input type="text" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Amount did not match, please check" />
+            <input type="text" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Reference number is not readable, please send again" />
           </label>
         </Modal>
       )}

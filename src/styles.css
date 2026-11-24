@@ -1406,3 +1406,25 @@ h2 { font-size: 1.05rem; letter-spacing: .07em; }
 
 /* One-tap delete on active booking rows */
 .row-del { flex: none; min-width: 40px; min-height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Payment receipt screenshots */
+.receipt-thumb { position: relative; display: inline-flex; flex: none; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: rgba(255, 255, 255, .04); cursor: zoom-in; }
+.receipt-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.receipt-md { width: 92px; height: 120px; }
+.receipt-sm { width: 56px; height: 72px; }
+.receipt-thumb:hover, .receipt-thumb:focus-visible { border-color: var(--lime); }
+.receipt-zoom { position: absolute; inset: auto 0 0 0; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 3px 0; font-size: .68rem; font-weight: 600; color: #fff; background: rgba(0, 0, 0, .62); }
+.receipt-sm .receipt-zoom { font-size: .6rem; }
+.receipt-loading { width: 100%; height: 100%; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .08) 50%, transparent 70%); background-size: 200% 100%; animation: receipt-shine 1.2s linear infinite; }
+@keyframes receipt-shine { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .receipt-loading { animation: none; } }
+.receipt-full { display: block; max-width: 100%; max-height: 56vh; margin: 0 auto; border-radius: 8px; }
+.receipt-missing { display: inline-flex; align-items: center; gap: 4px; }
+.receipt-line { display: flex; align-items: center; gap: 10px; }
+.pay-upload { align-items: center; }
+.receipt-pick { flex: 1 1 220px; min-height: 48px; border-style: dashed; }
+.receipt-picked { flex: 1 1 220px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.receipt-picked-text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.pay-submitted .pay-sent { flex: 1; min-width: 0; }
+.pay-ref-row { align-items: center; }
+.pay-noref { line-height: 2; }

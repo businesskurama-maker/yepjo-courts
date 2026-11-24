@@ -122,6 +122,7 @@ export interface Reservation {
   payment_method?: 'venue' | 'online';
   payment_status?: PaymentStatus;
   payment_ref?: string | null;
+  payment_proof_path?: string | null;
   payment_submitted_at?: string | null;
   payment_verified_at?: string | null;
   payment_note?: string | null;
@@ -262,6 +263,7 @@ export interface Registration {
   payment_method: 'free' | 'online' | 'venue';
   payment_status: PaymentStatus;
   payment_ref: string | null;
+  payment_proof_path?: string | null;
   payment_note: string | null;
   hold_expires_at: string | null;
   created_at: string;
@@ -306,6 +308,7 @@ export interface CafeOrder {
   status: CafeOrderStatus;
   payment_status: PaymentStatus;
   payment_ref: string | null;
+  payment_proof_path?: string | null;
   payment_note: string | null;
   hold_expires_at: string | null;
   refund_amount: number | null;
