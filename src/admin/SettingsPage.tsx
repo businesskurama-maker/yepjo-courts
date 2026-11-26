@@ -182,9 +182,6 @@ export default function SettingsPage() {
                   <option value={60}>1 hour</option>
                 </select>
               </Field>
-              <Field label="Upcoming bookings allowed per customer">
-                <input type="number" min={1} max={50} value={form.max_active_bookings} onChange={(e) => set('max_active_bookings', num(e.target.value, 1, 50))} />
-              </Field>
             </div>
             <div className="form-2">
               <Field label="Shortest booking (slots)" hint={`= ${fmtDuration(form.min_slots * form.slot_minutes)}`}>
