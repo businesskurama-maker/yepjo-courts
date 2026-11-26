@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Empty, Icon, Modal, Notice, Pager, Spinner, useToast } from '../components/ui';
+import { Confirm, Empty, Field, Icon, Modal, Notice, Pager, Spinner, useToast } from '../components/ui';
 import { useCountdown } from '../components/Payment';
 import { ReceiptThumb } from '../components/Receipt';
 import { Link } from '../lib/router';
@@ -28,6 +28,7 @@ export default function Payments() {
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<Reservation | null>(null);
+  const [closing, setClosing] = useState<{ r: Reservation; mode: 'reject' | 'delete' } | null>(null);
   const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
@@ -57,6 +58,22 @@ export default function Payments() {
     void load();
   };
 
+  // Unpaid hold: reject (cancel, keep the record) or delete (remove for good). Both open the court again.
+  const removeHold = async () => {
+    if (!closing) return;
+    const { r, mode } = closing;
+    setBusyId(r.id);
+    const { error: err } = mode === 'reject'
+      ? await supabase.rpc('admin_reject_reservation', { p_id: r.id, p_note: note || null })
+      : await supabase.rpc('admin_delete_reservation', { p_id: r.id, p_reason: note || 'Not paid' });
+    setBusyId(null);
+    if (err) toast(toAppError(err).message, 'error');
+    else toast(mode === 'reject' ? `${r.reference} was rejected. The court is open again.` : `${r.reference} was deleted. The court is open again.`);
+    setClosing(null);
+    setNote('');
+    void load();
+  };
+
   const courtLabel = (id: number) => {
     const c = courts.find((x) => x.id === id);
     return c ? `${SPORT_LABEL[c.sport]} · ${c.name}` : `Court #${id}`;
@@ -82,7 +99,7 @@ export default function Payments() {
       {error && <Notice kind="error">{error}</Notice>}
       {rows === null && !error && <Spinner />}
       {rows !== null && list.length === 0 && (
-        <Empty icon="check" title={tab === 'check' ? 'Nothing to check' : tab === 'waiting' ? 'No unpaid holds' : 'No approved payments yet'}>
+        <Empty icon="check" title={tab === 'check' ? 'Nothing to check' : tab === 'waiting' ? 'No unpaid reservations' : 'No approved payments yet'}>
           {tab === 'check' && 'New receipt screenshots appear here as soon as customers send them.'}
         </Empty>
       )}
@@ -120,9 +137,20 @@ export default function Payments() {
             {r.payment_status === 'rejected' && r.payment_note && <p className="tiny warn-text">Rejected: {r.payment_note}</p>}
             {r.status === 'pending' && (
               <div className="btn-row">
-                <button type="button" className="btn btn-sm btn-outline-danger" disabled={busyId === r.id} onClick={() => { setRejecting(r); setNote(''); }}>
-                  <Icon name="x" size={16} /> Reject
-                </button>
+                {r.payment_status === 'submitted' ? (
+                  <button type="button" className="btn btn-sm btn-outline-danger" disabled={busyId === r.id} onClick={() => { setRejecting(r); setNote(''); }}>
+                    <Icon name="x" size={16} /> Reject
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className="btn btn-sm btn-outline-danger" disabled={busyId === r.id} onClick={() => { setClosing({ r, mode: 'delete' }); setNote(''); }}>
+                      <Icon name="trash" size={16} /> Delete
+                    </button>
+                    <button type="button" className="btn btn-sm btn-outline-danger" disabled={busyId === r.id} onClick={() => { setClosing({ r, mode: 'reject' }); setNote(''); }}>
+                      <Icon name="x" size={16} /> Reject
+                    </button>
+                  </>
+                )}
                 <button type="button" className="btn btn-sm btn-primary" disabled={busyId === r.id} onClick={() => void review(r, true)}>
                   <Icon name="check" size={16} /> {r.payment_status === 'submitted' ? 'Approve payment' : 'Mark as paid'}
                 </button>
@@ -134,6 +162,23 @@ export default function Payments() {
       {tab === 'verified' && list.length > 0 && <p className="tiny muted">Receipt screenshots are kept for 30 days after approval, then removed automatically. The booking and the sale stay on record.</p>}
       <Pager page={page} pageSize={PAGE_SIZE} total={list.length} onPage={setPage} />
 
+      {closing && (
+        <Confirm danger busy={busyId === closing.r.id} onConfirm={() => void removeHold()} onClose={() => setClosing(null)}
+          title={closing.mode === 'reject' ? 'Reject this reservation?' : 'Delete this reservation?'}
+          confirmLabel={closing.mode === 'reject' ? 'Reject reservation' : 'Delete reservation'}>
+          <p><strong>{closing.r.customer_name ?? 'Customer'}</strong> · {closing.r.reference}<br />
+            {courtLabel(closing.r.court_id)}<br />{fmtDateLong(closing.r.starts_at)} · {fmtRange(closing.r.starts_at, closing.r.ends_at)}</p>
+          <Field label={closing.mode === 'reject' ? 'Reason shown to the customer (optional)' : 'Reason (optional, saved in the activity log)'}>
+            <input type="text" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Payment not received" />
+          </Field>
+          <p className="tiny muted">
+            {closing.mode === 'reject'
+              ? 'No payment was received. The reservation is cancelled and stays on record under Cancelled; the customer sees it as cancelled. The court opens again.'
+              : 'No payment was received. The reservation is removed for good and the court opens again. The activity log keeps who deleted it.'}
+          </p>
+        </Confirm>
+      )}
+
       {rejecting && (
         <Modal title="Reject this payment?" onClose={() => setRejecting(null)}
           footer={<>
@@ -141,7 +186,7 @@ export default function Payments() {
             <button type="button" className="btn btn-danger" disabled={busyId === rejecting.id} onClick={() => void review(rejecting, false, note)}>Reject payment</button>
           </>}>
           <p className="small">{rejecting.customer_name} · {rejecting.reference}</p>
-          <p className="small muted">The court stays held for another {settings.payment_hold_minutes} minutes so they can send a new screenshot. To release the court now, cancel the booking in Bookings instead.</p>
+          <p className="small muted">The court stays held for another {settings.payment_hold_minutes} minutes so they can send a new screenshot. </p>
           <label className="field">
             <span className="field-label">Message to the customer (optional)</span>
             <input type="text" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Reference number is not readable, please send again" />

@@ -292,6 +292,7 @@ const ACTION_LABEL: Record<string, string> = {
   'reservation.block': 'Time blocked',
   'reservation.cancel': 'Booking cancelled',
   'reservation.delete': 'Booking deleted by staff',
+  'reservation.reject': 'Unpaid reservation rejected by staff',
   'receipts.purge': 'Old payment screenshots removed',
   'payment.verify': 'Online payment approved',
   'payment.reject': 'Online payment rejected',
